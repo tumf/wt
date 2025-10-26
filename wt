@@ -118,12 +118,15 @@ EOF
         if [ ! -d ".wt" ]; then
             mkdir -p .wt
             echo "worktrees" > .wt/.gitignore
+            echo "*.local" > .wt/.gitignore
         fi
 
         # Create .wt/setup template if it doesn't exist
         if [ ! -f ".wt/setup" ]; then
             cat > .wt/setup << 'EOF'
 #! /bin/bash
+# wt - Git Worktree Management Tool
+# https://github.com/tumf/wt
 # $ROOT_WORKTREE_PATH is the path to the root of the worktree
 EOF
         fi
