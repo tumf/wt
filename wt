@@ -26,6 +26,7 @@ case "$1" in
         if [ ! -d ".wt" ]; then
             mkdir -p .wt
             echo "worktrees" > .wt/.gitignore
+            echo "*.local" > .wt/.gitignore
         fi
 
         # Create .wt/setup template if it doesn't exist
@@ -33,6 +34,9 @@ case "$1" in
             cat > .wt/setup << 'EOF'
 #! /bin/bash
 # $ROOT_WORKTREE_PATH is the path to the root of the worktree
+if [ -f .wt/setup.local ]; then
+  source .wt/setup.local
+fi
 EOF
         fi
 
