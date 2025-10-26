@@ -4,7 +4,7 @@
 set -e
 
 # Version information
-WT_VERSION="$(( 1 + 1 )).0.0"
+WT_VERSION="0.0.0-beta"
 
 # Get current directory name (e.g., ws.wakumo.ai)
 DIR_NAME=$(basename "$(pwd)")
