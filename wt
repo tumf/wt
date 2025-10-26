@@ -61,8 +61,12 @@ EOF
         echo "Created worktree at $WORKTREE_DIR"
         echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-        # Run setup script if it exists
+        # Copy setup script to worktree if it exists in project
         if [ -f ".wt/setup" ]; then
+            mkdir -p "$WORKTREE_DIR/.wt"
+            cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
+            chmod +x "$WORKTREE_DIR/.wt/setup"
+
             echo "Running setup script..."
             ROOT_WORKTREE_PATH="$WORKTREE_DIR" bash "$WORKTREE_DIR/.wt/setup"
             echo "Setup script completed"
@@ -97,8 +101,78 @@ EOF
         echo "Worktrees:"
         git worktree list
         ;;
+    go)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 go <name>"
+            exit 1
+        fi
+
+        NAME="$2"
+        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${NAME}"
+        SYMLINK_PATH=".wt/worktrees/${NAME}"
+
+        # Create .wt directory and .gitignore if they don't exist
+        if [ ! -d ".wt" ]; then
+            mkdir -p .wt
+            echo "worktrees" > .wt/.gitignore
+        fi
+
+        # Create .wt/setup template if it doesn't exist
+        if [ ! -f ".wt/setup" ]; then
+            cat > .wt/setup << 'EOF'
+#! /bin/bash
+# $ROOT_WORKTREE_PATH is the path to the root of the worktree
+EOF
+        fi
+
+        mkdir -p .wt/worktrees
+
+        # Check if worktree already exists
+        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+            echo "Worktree '$NAME' exists, navigating to it"
+        else
+            echo "Worktree '$NAME' does not exist, creating it first"
+
+            # Check if branch exists
+            if git branch --list "$NAME" | grep -q "$NAME"; then
+                echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+                git worktree add "$WORKTREE_DIR" "$NAME"
+            else
+                echo "Creating new branch '$NAME' and adding worktree."
+                git worktree add "$WORKTREE_DIR" -b "$NAME"
+            fi
+
+            # Create symlink in .wt/worktrees directory
+            if [ -e "$SYMLINK_PATH" ]; then
+                echo "Symlink already exists at $SYMLINK_PATH"
+                exit 1
+            fi
+
+            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+            echo "Created worktree at $WORKTREE_DIR"
+            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+
+            # Copy setup script to worktree if it exists in project
+            if [ -f ".wt/setup" ]; then
+                mkdir -p "$WORKTREE_DIR/.wt"
+                cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
+                chmod +x "$WORKTREE_DIR/.wt/setup"
+
+                echo "Running setup script..."
+                ROOT_WORKTREE_PATH="$WORKTREE_DIR" bash "$WORKTREE_DIR/.wt/setup"
+                echo "Setup script completed"
+            fi
+        fi
+
+        # Change to worktree directory
+        echo "Changing to worktree directory: $WORKTREE_DIR"
+        cd "$WORKTREE_DIR"
+        # Note: The cd only affects the subshell, user needs to source the script or use alias
+        echo "To change to this directory in your current shell, run:"
+        echo "  cd $WORKTREE_DIR"
+        ;;
     *)
-        echo "Usage: $0 add <name> | remove <name> | list"
+        echo "Usage: $0 add <name> | remove <name> | list | go <name>"
         exit 1
         ;;
 esac
