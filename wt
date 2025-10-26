@@ -1,0 +1,104 @@
+#!/bin/bash
+# git worktree management
+
+set -e
+
+# Get current directory name (e.g., ws.wakumo.ai)
+DIR_NAME=$(basename "$(pwd)")
+
+# Default tmp directory
+TMP_DIR="${HOME}/tmp"
+
+case "$1" in
+    add)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 add <name>"
+            exit 1
+        fi
+
+        NAME="$2"
+        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${NAME}"
+
+        # Create .wt directory and .gitignore if they don't exist
+        if [ ! -d ".wt" ]; then
+            mkdir -p .wt
+            echo "worktrees" > .wt/.gitignore
+        fi
+
+        # Create .wt/setup template if it doesn't exist
+        if [ ! -f ".wt/setup" ]; then
+            cat > .wt/setup << 'EOF'
+#! /bin/bash
+# $ROOT_WORKTREE_PATH is the path to the root of the worktree
+EOF
+        fi
+
+        mkdir -p .wt/worktrees
+
+        # Check if worktree already exists
+        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+            echo "Worktree already exists at $WORKTREE_DIR"
+            exit 1
+        fi
+
+        # Check if branch exists
+        if git branch --list "$NAME" | grep -q "$NAME"; then
+            echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+            git worktree add "$WORKTREE_DIR" "$NAME"
+        else
+            echo "Creating new branch '$NAME' and adding worktree."
+            git worktree add "$WORKTREE_DIR" -b "$NAME"
+        fi
+
+        # Create symlink in .wt/worktrees directory
+        SYMLINK_PATH=".wt/worktrees/${NAME}"
+        if [ -e "$SYMLINK_PATH" ]; then
+            echo "Symlink already exists at $SYMLINK_PATH"
+            exit 1
+        fi
+
+        ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+        echo "Created worktree at $WORKTREE_DIR"
+        echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+
+        # Run setup script if it exists
+        if [ -f ".wt/setup" ]; then
+            echo "Running setup script..."
+            ROOT_WORKTREE_PATH="$WORKTREE_DIR" bash "$WORKTREE_DIR/.wt/setup"
+            echo "Setup script completed"
+        fi
+        ;;
+    remove)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 remove <name>"
+            exit 1
+        fi
+
+        NAME="$2"
+        SYMLINK_PATH=".wt/worktrees/${NAME}"
+
+        if [ ! -e "$SYMLINK_PATH" ]; then
+            echo "Worktree '$NAME' not found at $SYMLINK_PATH"
+            exit 1
+        fi
+
+        # Get actual worktree path
+        ACTUAL_WORKTREE_DIR=$(readlink -f "$SYMLINK_PATH")
+
+        # Remove worktree using git
+        echo "Removing worktree at $ACTUAL_WORKTREE_DIR"
+        git worktree remove "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
+
+        # Remove symlink
+        rm "$SYMLINK_PATH"
+        echo "Removed symlink $SYMLINK_PATH"
+        ;;
+    list)
+        echo "Worktrees:"
+        git worktree list
+        ;;
+    *)
+        echo "Usage: $0 add <name> | remove <name> | list"
+        exit 1
+        ;;
+esac
