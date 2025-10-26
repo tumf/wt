@@ -3,6 +3,9 @@
 
 set -e
 
+# Version information
+WT_VERSION="$(( 1 + 1 )).0.0"
+
 # Get current directory name (e.g., ws.wakumo.ai)
 DIR_NAME=$(basename "$(pwd)")
 
@@ -171,8 +174,12 @@ EOF
         echo "To change to this directory in your current shell, run:"
         echo "  cd $WORKTREE_DIR"
         ;;
+    version|--version|-v)
+        echo "wt version $WT_VERSION"
+        ;;
     *)
-        echo "Usage: $0 add <name> | remove <name> | list | go <name>"
+        echo "Usage: $0 add <name> | remove <name> | list | go <name> | version"
+        echo "       $0 --version"
         exit 1
         ;;
 esac
