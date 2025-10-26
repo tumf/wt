@@ -45,7 +45,7 @@ This is a git worktree management tool called `wt` - a shell script that provide
 ### Core Components
 
 **wt (main script)**: A bash script that provides four main operations:
-- **add**: Creates new git worktrees in `~/tmp/<project>-<name>` with symlinks in `.wt/worktrees/`
+- **add**: Creates new git worktrees in `~/.wt/workspaces/<project>-<name>` with symlinks in `.wt/worktrees/`
 - **go**: Navigates to worktree (creates it if missing) and provides navigation guidance
 - **remove**: Safely removes worktrees and cleans up symlinks
 - **list**: Displays all current worktrees
@@ -63,8 +63,8 @@ project/
 
 ### Worktree Locations
 
-- **Actual worktrees**: `~/tmp/<current-dir-name>-<branch-name>`
-- **Symlinks**: `.wt/worktrees/<branch-name>` → `~/tmp/<current-dir-name>-<branch-name>`
+- **Actual worktrees**: `~/.wt/workspaces/<current-dir-name>-<branch-name>`
+- **Symlinks**: `.wt/worktrees/<branch-name>` → `~/.wt/workspaces/<current-dir-name>-<branch-name>`
 
 ### Setup System
 

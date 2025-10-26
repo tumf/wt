@@ -50,7 +50,7 @@ Creates a worktree if needed and navigates to it.
 
 Managing git worktrees manually can be cumbersome. `wt` simplifies this by:
 
-- **🗂️ Organization**: Creates worktrees in a consistent location (`~/tmp/`)
+- **🗂️ Organization**: Creates worktrees in a consistent location (`~/.wt/workspaces/`)
 - **🔗 Symlinks**: Provides easy access through project-local symlinks
 - **⚡ Automation**: Handles branch creation and cleanup automatically
 - **🛠️ Setup Integration**: Runs project-specific setup scripts
@@ -64,13 +64,13 @@ Creates a new worktree for the specified branch name.
 
 ```bash
 ./wt add feature-login
-# Creates new branch 'feature-login' and worktree at ~/tmp/project-feature-login
-# Creates symlink .wt/worktrees/feature-login -> ~/tmp/project-feature-login
+# Creates new branch 'feature-login' and worktree at ~/.wt/workspaces/project-feature-login
+# Creates symlink .wt/worktrees/feature-login -> ~/.wt/workspaces/project-feature-login
 ```
 
 **What happens:**
 1. Checks if branch exists - creates it if not
-2. Creates worktree at `~/tmp/<project>-<name>`
+2. Creates worktree at `~/.wt/workspaces/<project>-<name>`
 3. Creates symlink at `.wt/worktrees/<name>`
 4. Runs optional setup script if `.wt/setup` exists
 
@@ -129,14 +129,14 @@ your-project/
     ├── .gitignore              # Ignores worktrees directory
     ├── setup                   # Optional setup script (template)
     └── worktrees/              # Symlinks to actual worktrees
-        ├── feature-auth        # -> ~/tmp/your-project-feature-auth
-        ├── bugfix-123          # -> ~/tmp/your-project-bugfix-123
-        └── experimental        # -> ~/tmp/your-project-experimental
+        ├── feature-auth        # -> ~/.wt/workspaces/your-project-feature-auth
+        ├── bugfix-123          # -> ~/.wt/workspaces/your-project-bugfix-123
+        └── experimental        # -> ~/.wt/workspaces/your-project-experimental
 ```
 
 **Actual worktrees are stored in:**
 ```
-~/tmp/
+~/.wt/workspaces/
 ├── your-project-feature-auth/
 ├── your-project-bugfix-123/
 └── your-project-experimental/
@@ -283,7 +283,7 @@ make bump-patch      # 1.1.0 -> 1.1.1
 ## ⚙️ Configuration
 
 ### Default Worktree Location
-By default, worktrees are created in `~/tmp/`. You can modify this by editing the `TMP_DIR` variable in the `wt` script:
+By default, worktrees are created in `~/.wt/workspaces/`. You can modify this by editing the `TMP_DIR` variable in the `wt` script:
 
 ```bash
 # Change this line in the wt script
@@ -373,7 +373,7 @@ If you encounter issues:
 1. Check that you're in a git repository
 2. Ensure script is executable
 3. Verify git worktree support: `git worktree --version`
-4. Check permissions on your `~/tmp/` directory
+4. Check permissions on your `~/.wt/workspaces/` directory
 5. Check Makefile targets: `make help`
 
 ---

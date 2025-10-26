@@ -9,8 +9,8 @@ WT_VERSION="0.0.0-beta"
 # Get current directory name (e.g., ws.wakumo.ai)
 DIR_NAME=$(basename "$(pwd)")
 
-# Default tmp directory
-TMP_DIR="${HOME}/tmp"
+# Default workspace directory
+TMP_DIR="${HOME}/.wt/workspaces"
 
 case "$1" in
     add)
