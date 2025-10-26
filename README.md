@@ -13,6 +13,9 @@ chmod +x wt
 # Create your first worktree
 ./wt add feature-authentication
 
+# Navigate to worktree (creates if needed)
+./wt go feature-authentication
+
 # List all worktrees
 ./wt list
 
