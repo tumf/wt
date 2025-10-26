@@ -9,8 +9,8 @@ WT_VERSION="0.0.0-beta"
 # Get current directory name (e.g., ws.wakumo.ai)
 DIR_NAME=$(basename "$(pwd)")
 
-# Default workspace directory
-TMP_DIR="${HOME}/.wt/workspaces"
+# Default worktree directory
+TMP_DIR="${HOME}/.wt/worktrees"
 
 case "$1" in
     add)
@@ -33,7 +33,7 @@ case "$1" in
         if [ ! -f ".wt/setup" ]; then
             cat > .wt/setup << 'EOF'
 #! /bin/bash
-# $ROOT_WORKTREE_PATH is the path to the root of the worktree
+# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
 if [ -f .wt/setup.local ]; then
   source .wt/setup.local
 fi
@@ -75,7 +75,7 @@ EOF
             chmod +x "$WORKTREE_DIR/.wt/setup"
 
             echo "Running setup script..."
-            ROOT_WORKTREE_PATH="$WORKTREE_DIR" bash "$WORKTREE_DIR/.wt/setup"
+            ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
             echo "Setup script completed"
         fi
         ;;
@@ -131,7 +131,7 @@ EOF
 #! /bin/bash
 # wt - Git Worktree Management Tool
 # https://github.com/tumf/wt
-# $ROOT_WORKTREE_PATH is the path to the root of the worktree
+# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
 EOF
         fi
 
@@ -169,7 +169,7 @@ EOF
                 chmod +x "$WORKTREE_DIR/.wt/setup"
 
                 echo "Running setup script..."
-                ROOT_WORKTREE_PATH="$WORKTREE_DIR" bash "$WORKTREE_DIR/.wt/setup"
+                ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
                 echo "Setup script completed"
             fi
         fi

@@ -45,7 +45,7 @@ This is a git worktree management tool called `wt` - a shell script that provide
 ### Core Components
 
 **wt (main script)**: A bash script that provides four main operations:
-- **add**: Creates new git worktrees in `~/.wt/workspaces/<project>-<name>` with symlinks in `.wt/worktrees/`
+- **add**: Creates new git worktrees in `~/.wt/worktrees/<project>-<name>` with symlinks in `.wt/worktrees/`
 - **go**: Navigates to worktree (creates it if missing) and provides navigation guidance
 - **remove**: Safely removes worktrees and cleans up symlinks
 - **list**: Displays all current worktrees
@@ -63,14 +63,14 @@ project/
 
 ### Worktree Locations
 
-- **Actual worktrees**: `~/.wt/workspaces/<current-dir-name>-<branch-name>`
-- **Symlinks**: `.wt/worktrees/<branch-name>` → `~/.wt/workspaces/<current-dir-name>-<branch-name>`
+- **Actual worktrees**: `~/.wt/worktrees/<current-dir-name>-<branch-name>`
+- **Symlinks**: `.wt/worktrees/<branch-name>` → `~/.wt/worktrees/<current-dir-name>-<branch-name>`
 
 ### Setup System
 
 The tool supports an optional `.wt/setup` script that runs after worktree creation:
 - Template created automatically on first `add` operation
-- Receives `$ROOT_WORKTREE_PATH` environment variable
+- Receives `$ROOT_WORKTREE_PATH` environment variable pointing to the base repository (source tree)
 - Runs after `wt add` and `wt go` (when creating new worktree)
 - Useful for initializing project-specific dependencies or configurations
 
@@ -91,4 +91,4 @@ This tool is designed for projects that frequently need isolated worktrees for:
 - Experimental changes
 - Parallel development streams
 
-The worktrees are created outside the main project directory to keep the workspace clean while maintaining easy access through symlinks.
+The worktrees are created outside the main project directory to keep the worktree clean while maintaining easy access through symlinks.
