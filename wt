@@ -20,13 +20,15 @@ case "$1" in
         fi
 
         NAME="$2"
-        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${NAME}"
+        # Sanitize branch name for directory use (replace / and other invalid chars with _)
+        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
 
         # Create .wt directory and .gitignore if they don't exist
         if [ ! -d ".wt" ]; then
             mkdir -p .wt
-            echo "worktrees" > .wt/.gitignore
-            echo "*.local" > .wt/.gitignore
+            echo "worktrees" >> .wt/.gitignore
+            echo "*.local" >> .wt/.gitignore
         fi
 
         # Create .wt/setup template if it doesn't exist
@@ -58,7 +60,7 @@ EOF
         fi
 
         # Create symlink in .wt/worktrees directory
-        SYMLINK_PATH=".wt/worktrees/${NAME}"
+        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
         if [ -e "$SYMLINK_PATH" ]; then
             echo "Symlink already exists at $SYMLINK_PATH"
             exit 1
@@ -79,14 +81,16 @@ EOF
             echo "Setup script completed"
         fi
         ;;
-    remove)
+    remove|rm)
         if [ -z "$2" ]; then
             echo "Usage: $0 remove <name>"
             exit 1
         fi
 
         NAME="$2"
-        SYMLINK_PATH=".wt/worktrees/${NAME}"
+        # Sanitize branch name for directory use (replace / and other invalid chars with _)
+        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
 
         if [ ! -e "$SYMLINK_PATH" ]; then
             echo "Worktree '$NAME' not found at $SYMLINK_PATH"
@@ -98,7 +102,7 @@ EOF
 
         # Remove worktree using git
         echo "Removing worktree at $ACTUAL_WORKTREE_DIR"
-        git worktree remove "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
+        git worktree remove -f "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
 
         # Remove symlink
         rm "$SYMLINK_PATH"
@@ -115,8 +119,10 @@ EOF
         fi
 
         NAME="$2"
-        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${NAME}"
-        SYMLINK_PATH=".wt/worktrees/${NAME}"
+        # Sanitize branch name for directory use (replace / and other invalid chars with _)
+        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
 
         # Create .wt directory and .gitignore if they don't exist
         if [ ! -d ".wt" ]; then
@@ -176,10 +182,7 @@ EOF
 
         # Change to worktree directory
         echo "Changing to worktree directory: $WORKTREE_DIR"
-        cd "$WORKTREE_DIR"
-        # Note: The cd only affects the subshell, user needs to source the script or use alias
-        echo "To change to this directory in your current shell, run:"
-        echo "  cd $WORKTREE_DIR"
+        cd "$WORKTREE_DIR" && $SHELL
         ;;
     version|--version|-v)
         echo "wt version $WT_VERSION"
