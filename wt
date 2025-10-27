@@ -82,12 +82,30 @@ EOF
         fi
         ;;
     remove|rm)
-        if [ -z "$2" ]; then
-            echo "Usage: $0 remove <name>"
+        FORCE_FLAG=""
+        NAME=""
+        
+        # Parse arguments
+        while [ $# -gt 1 ]; do
+            case "$2" in
+                -f|--force)
+                    FORCE_FLAG="-f"
+                    shift
+                    ;;
+                *)
+                    if [ -z "$NAME" ]; then
+                        NAME="$2"
+                    fi
+                    shift
+                    ;;
+            esac
+        done
+
+        if [ -z "$NAME" ]; then
+            echo "Usage: $0 remove [-f|--force] <name>"
             exit 1
         fi
 
-        NAME="$2"
         # Sanitize branch name for directory use (replace / and other invalid chars with _)
         SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
         SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
@@ -102,7 +120,11 @@ EOF
 
         # Remove worktree using git
         echo "Removing worktree at $ACTUAL_WORKTREE_DIR"
-        git worktree remove -f "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
+        if [ -n "$FORCE_FLAG" ]; then
+            git worktree remove -f "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
+        else
+            git worktree remove "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
+        fi
 
         # Remove symlink
         rm "$SYMLINK_PATH"
@@ -188,7 +210,7 @@ EOF
         echo "wt version $WT_VERSION"
         ;;
     *)
-        echo "Usage: $0 add <name> | remove <name> | list | go <name> | version"
+        echo "Usage: $0 add <name> | remove [-f|--force] <name> | list | go <name> | version"
         echo "       $0 --version"
         exit 1
         ;;
