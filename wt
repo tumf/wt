@@ -125,10 +125,17 @@ EOF
         else
             git worktree remove "$ACTUAL_WORKTREE_DIR" || echo "Note: Worktree may have already been removed"
         fi
-
-        # Remove symlink
-        rm "$SYMLINK_PATH"
-        echo "Removed symlink $SYMLINK_PATH"
+        # when the worktree is removed, the symlink is also removed
+        if [ -e "$ACTUAL_WORKTREE_DIR" ]; then
+            echo "Worktree still exists at $ACTUAL_WORKTREE_DIR"
+            echo "Worktree not removed"
+            exit 1
+        fi
+        if [ -e "$SYMLINK_PATH" ]; then
+            rm "$SYMLINK_PATH" || echo "Note: Symlink may have already been removed"
+            echo "Removed symlink $SYMLINK_PATH"
+        fi
+        echo "Worktree removed successfully"
         ;;
     list)
         echo "Worktrees:"
