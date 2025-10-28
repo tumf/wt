@@ -138,7 +138,6 @@ EOF
         echo "Worktree removed successfully"
         ;;
     list)
-        echo "Worktrees:"
         git worktree list
         ;;
     go)
@@ -216,9 +215,8 @@ EOF
     version|--version|-v)
         echo "wt version $WT_VERSION"
         ;;
-    *)
-        echo "Usage: $0 add <name> | remove [-f|--force] <name> | list | go <name> | version"
-        echo "       $0 --version"
-        exit 1
+    ""|*)
+        # No subcommand provided, default to list
+        git worktree list
         ;;
 esac
