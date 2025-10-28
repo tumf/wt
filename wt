@@ -215,8 +215,162 @@ EOF
     version|--version|-v)
         echo "wt version $WT_VERSION"
         ;;
+    completions)
+        SHELL_NAME="$2"
+        if [ -z "$SHELL_NAME" ]; then
+            echo "Usage: $0 completions <bash|zsh|fish|powershell>"
+            echo
+            echo "Install instructions:"
+            echo "- bash:        wt completions bash > ~/.local/share/bash-completion/completions/wt (or /etc/bash_completion.d/wt)"
+            echo "- zsh:         wt completions zsh > ~/.zsh/completions/_wt; echo 'fpath+=(~/.zsh/completions)' >> ~/.zshrc; autoload -Uz compinit && compinit"
+            echo "- fish:        wt completions fish > ~/.config/fish/completions/wt.fish"
+            echo "- powershell:  wt completions powershell | Out-String | Invoke-Expression (or save to your profile)"
+            exit 1
+        fi
+        case "$SHELL_NAME" in
+            bash)
+                cat <<'EOF'
+# bash completion for wt
+_wt()
+{
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local subs="add remove rm list go version completions"
+    if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$subs" -- "$cur") )
+        return 0
+    fi
+    case "${COMP_WORDS[1]}" in
+        remove|rm)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "--force -f" -- "$cur") )
+            else
+                local names
+                names=$(ls .wt/worktrees 2>/dev/null)
+                COMPREPLY=( $(compgen -W "$names" -- "$cur") )
+            fi
+            ;;
+        go|add)
+            local names
+            names=$(ls .wt/worktrees 2>/dev/null)
+            COMPREPLY=( $(compgen -W "$names" -- "$cur") )
+            ;;
+        completions)
+            COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") )
+            ;;
+        *) ;;
+    esac
+}
+complete -F _wt wt
+EOF
+                ;;
+            zsh)
+                cat <<'EOF'
+#compdef wt
+local -a subcommands
+subcommands=(
+  'add:Add a worktree'
+  'remove:Remove a worktree'
+  'rm:Alias of remove'
+  'list:List worktrees'
+  'go:Create or navigate to worktree'
+  'version:Show version'
+  'completions:Generate shell completion script'
+)
+_arguments \
+  '1:command:->cmds' \
+  '*::arg:->args'
+case $state in
+  cmds)
+    _describe 'command' subcommands
+    ;;
+  args)
+    case $words[2] in
+      remove|rm)
+        _arguments '2:worktree:->names'
+        ;&
+      go|add)
+        _arguments '2:worktree:->names'
+        ;&
+      completions)
+        _values 'shell' bash zsh fish powershell
+        ;;
+    esac
+    case $state in
+      names)
+        _values 'worktree' $(ls .wt/worktrees 2>/dev/null)
+        ;;
+    esac
+    ;;
+esac
+EOF
+                ;;
+            fish)
+                cat <<'EOF'
+# fish completion for wt
+complete -c wt -f
+complete -c wt -n '__fish_use_subcommand' -a add -d 'Add a worktree'
+complete -c wt -n '__fish_use_subcommand' -a remove -d 'Remove a worktree'
+complete -c wt -n '__fish_use_subcommand' -a rm -d 'Alias of remove'
+complete -c wt -n '__fish_use_subcommand' -a list -d 'List worktrees'
+complete -c wt -n '__fish_use_subcommand' -a go -d 'Create or navigate to worktree'
+complete -c wt -n '__fish_use_subcommand' -a version -d 'Show version'
+complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell completion script'
+# remove flags
+complete -c wt -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
+complete -c wt -n '__fish_seen_subcommand_from rm' -s f -l force -d 'Force removal'
+# worktree names for relevant subcommands
+complete -c wt -n '__fish_seen_subcommand_from go' -a '(ls .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from add' -a '(ls .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from remove' -a '(ls .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from rm' -a '(ls .wt/worktrees 2>/dev/null)'
+# shells for completions
+complete -c wt -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish powershell'
+EOF
+                ;;
+            powershell|pwsh|ps)
+                cat <<'EOF'
+# PowerShell argument completer for wt
+Register-ArgumentCompleter -CommandName wt -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  $subs = @('add','remove','rm','list','go','version','completions')
+  $tokens = [System.Management.Automation.PSParser]::Tokenize($commandAst.ToString(), [ref]$null)
+  $args = @($tokens | Where-Object { $_.Type -in 'CommandArgument','Parameter' } | ForEach-Object Value)
+  if ($args.Count -lt 1) {
+    $subs | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+    return
+  }
+  $sub = $args[0]
+  switch ($sub) {
+    'completions' {
+      @('bash','zsh','fish','powershell') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+    }
+    'remove' { goto names }
+    'rm'     { goto names }
+    'go'     { goto names }
+    'add'    { goto names }
+    default  { }
+  }
+  return
+  :names
+  $names = @()
+  try { $names = Get-ChildItem -Name '.wt/worktrees' -ErrorAction Stop } catch {}
+  $names | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+}
+EOF
+                ;;
+            *)
+                echo "Unsupported shell: $SHELL_NAME"
+                echo "Supported: bash, zsh, fish, powershell"
+                exit 1
+                ;;
+        esac
+        ;;
     ""|*)
         # No subcommand provided, default to list
         git worktree list
         ;;
-esac
+ esac
+
