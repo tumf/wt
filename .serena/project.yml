@@ -1,0 +1,16 @@
+---
+project_name: wt
+language: bash
+ignore_all_files_in_gitignore: true
+ignored_paths:
+  - .wt
+  - .git
+  - .github
+  - .vscode
+  - .idea
+  - .pytest_cache
+  - .ruff_cache
+  - .mypy_cache
+  - .pytest_cache
+  - .ruff_cache
+  - .mypy_cache
