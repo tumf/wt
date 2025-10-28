@@ -257,6 +257,97 @@ EOF
         echo "Changing to worktree directory: $WORKTREE_DIR"
         cd "$WORKTREE_DIR" && $SHELL
         ;;
+    run)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 run <name> -- <command>"
+            exit 1
+        fi
+
+        NAME="$2"
+        
+        # Check if -- delimiter exists and extract command
+        if [ "$3" != "--" ]; then
+            echo "Usage: $0 run <name> -- <command>"
+            exit 1
+        fi
+        
+        if [ -z "$4" ]; then
+            echo "Usage: $0 run <name> -- <command>"
+            exit 1
+        fi
+        
+        # Extract command arguments (everything after --)
+        COMMAND_ARGS="${@:4}"
+        # Sanitize branch name for directory use (replace / and other invalid chars with _)
+        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+
+        # Create .wt directory and .gitignore if they don't exist
+        if [ ! -d ".wt" ]; then
+            mkdir -p .wt
+            echo "worktrees" > .wt/.gitignore
+            echo "*.local" > .wt/.gitignore
+        fi
+
+        # Create .wt/setup template if it doesn't exist
+        if [ ! -f ".wt/setup" ]; then
+            cat > .wt/setup << 'EOF'
+#! /bin/bash
+# wt - Git Worktree Management Tool
+# https://github.com/tumf/wt
+# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
+EOF
+        fi
+
+        mkdir -p .wt/worktrees
+
+        # Check if worktree already exists
+        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+            echo "Worktree '$NAME' exists, running command in it"
+        else
+            echo "Worktree '$NAME' does not exist, creating it first"
+
+            # Check if branch exists
+            if git branch --list "$NAME" | grep -q "$NAME"; then
+                echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+                git worktree add "$WORKTREE_DIR" "$NAME"
+            else
+                echo "Creating new branch '$NAME' and adding worktree."
+                git worktree add "$WORKTREE_DIR" -b "$NAME"
+            fi
+
+            # Create symlink in .wt/worktrees directory
+            if [ -e "$SYMLINK_PATH" ]; then
+                echo "Symlink already exists at $SYMLINK_PATH"
+                exit 1
+            fi
+
+            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+            echo "Created worktree at $WORKTREE_DIR"
+            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+
+            # Copy setup script to worktree if it exists in project
+            if [ -f ".wt/setup" ]; then
+                mkdir -p "$WORKTREE_DIR/.wt"
+                cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
+                chmod +x "$WORKTREE_DIR/.wt/setup"
+
+                echo "Running setup script..."
+                ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
+                echo "Setup script completed"
+            fi
+        fi
+
+        # Store current directory and execute command in worktree
+        CURRENT_DIR="$(pwd)"
+        echo "Running command in worktree '$NAME': $COMMAND_ARGS"
+        cd "$WORKTREE_DIR"
+        eval "$COMMAND_ARGS"
+        EXIT_CODE=$?
+        cd "$CURRENT_DIR"
+        exit $EXIT_CODE
+        ;;
     version|--version|-v)
         echo "wt version $WT_VERSION"
         ;;
@@ -441,7 +532,24 @@ EOF
         esac
         ;;
     ""|*)
-        # No subcommand provided, default to list
+        # No subcommand provided, show help
+        echo "wt - Git Worktree Management Tool v$WT_VERSION"
+        echo ""
+        echo "Usage: $0 <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  add <name>        Add a new worktree"
+        echo "  remove <name>     Remove a worktree"
+        echo "  list              List all worktrees"
+        echo "  go <name>         Create worktree if needed and navigate to it"
+        echo "  run <name> -- <command>  Run command in worktree (creates if needed)"
+        echo "  version           Show version information"
+        echo ""
+        echo "Examples:"
+        echo "  $0 add feature-branch"
+        echo "  $0 go feature-branch"
+        echo "  $0 run feature-branch -- git status"
+        echo ""
         git worktree list
         ;;
  esac
