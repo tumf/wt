@@ -219,19 +219,9 @@ Creates a worktree if needed and runs a command in it. The `--` (double hyphen) 
 ./wt run feature-login -- npm run test -- --watch
 ./wt run bugfix-123 -- make test VERBOSE=1
 
-# Create tmux window and open Claude Code in the worktree
-./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
-
-# Create tmux session if it doesn't exist, then add window
-./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
-
-# If already inside a tmux session (to avoid "sessions should be nested" error)
-# Option 1: Temporarily unset TMUX variable
-TMUX= ./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
-
-# Option 2: Add window to current tmux session (recommended)
-./wt run feature-auth -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-auth -c "$(pwd)" \; send-keys "claude 'refactor the codes'" Enter'
-```
+# Create tmux window and open Claude Code in the worktree from tmux session
+ tmux new-window -c "$(pwd)" "./wt run refactor -- claude 'refactor the code'" 
+ ```
 
 **What happens:**
 1. Checks if worktree exists - creates it using `add` logic if missing
