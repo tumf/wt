@@ -208,6 +208,12 @@ EOF
             fi
         fi
 
+        # Ensure symlink exists for completions
+        if [ ! -e "$SYMLINK_PATH" ]; then
+            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+        fi
+
         # Change to worktree directory
         echo "Changing to worktree directory: $WORKTREE_DIR"
         cd "$WORKTREE_DIR" && $SHELL
@@ -254,12 +260,18 @@ _wt()
             else
                 local names
                 names=$(command ls -1 .wt/worktrees 2>/dev/null)
+                if [ -z "$names" ]; then
+                    names=$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+                fi
                 COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             fi
             ;;
         go|add|run)
             local names
             names=$(command ls -1 .wt/worktrees 2>/dev/null)
+            if [ -z "$names" ]; then
+                names=$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+            fi
             COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             ;;
         completions)
@@ -268,45 +280,55 @@ _wt()
         *) ;;
     esac
 }
-complete -F _wt wt
+complete -F _wt wt ./wt
 EOF
                 ;;
             zsh)
                 cat <<'EOF'
-#compdef wt
-local -a subcommands
-subcommands=(
-  'add:Add a worktree'
-  'remove:Remove a worktree'
-  'rm:Alias of remove'
-  'list:List worktrees'
-  'go:Create or navigate to worktree'
-  'run:Run command in worktree'
-  'version:Show version'
-  'completions:Generate shell completion script'
-)
+#compdef wt ./wt
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
 _arguments \
-  '1:command:->cmds' \
-  '*::arg:->args'
+  '1: :->command' \
+  '*:: :->arg'
+
 case $state in
-  cmds)
-    _describe 'command' subcommands
+  command)
+    local -a subcommands
+    subcommands=(
+      'add:Add a worktree'
+      'remove:Remove a worktree'
+      'rm:Alias of remove'
+      'list:List worktrees'
+      'go:Create or navigate to worktree'
+      'run:Run command in worktree'
+      'version:Show version'
+      'completions:Generate shell completion script'
+    )
+    _describe -t commands 'command' subcommands
     ;;
-  args)
+  arg)
     case $words[2] in
       remove|rm)
-        _arguments '2:worktree:->names'
-        ;&
+        local -a names
+        names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
+        if [[ ${#names} -eq 0 ]]; then
+          names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
+        fi
+        _values 'worktree' $names
+        ;;
       go|add|run)
-        _arguments '2:worktree:->names'
-        ;&
+        local -a names
+        names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
+        if [[ ${#names} -eq 0 ]]; then
+          names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
+        fi
+        _values 'worktree' $names
+        ;;
       completions)
         _values 'shell' bash zsh fish powershell
-        ;;
-    esac
-    case $state in
-      names)
-        _values 'worktree' $(command ls -1 .wt/worktrees 2>/dev/null)
         ;;
     esac
     ;;
@@ -329,11 +351,15 @@ complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell comp
 complete -c wt -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
 complete -c wt -n '__fish_seen_subcommand_from rm' -s f -l force -d 'Force removal'
 # worktree names for relevant subcommands
-complete -c wt -n '__fish_seen_subcommand_from go' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from add' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from remove' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from rm' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from run' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
+set -l __wt_names (command ls -1 .wt/worktrees 2>/dev/null)
+if test -z "$__wt_names"
+    set __wt_names (git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+end
+complete -c wt -n '__fish_seen_subcommand_from go' -a "$__wt_names"
+complete -c wt -n '__fish_seen_subcommand_from add' -a "$__wt_names"
+complete -c wt -n '__fish_seen_subcommand_from remove' -a "$__wt_names"
+complete -c wt -n '__fish_seen_subcommand_from rm' -a "$__wt_names"
+complete -c wt -n '__fish_seen_subcommand_from run' -a "$__wt_names"
 # shells for completions
 complete -c wt -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish powershell'
 EOF
