@@ -215,6 +215,11 @@ EOF
     version|--version|-v)
         echo "wt version $WT_VERSION"
         ;;
+    complations)
+        echo "Did you mean 'completions'?" >&2
+        echo "Usage: $0 completions <bash|zsh|fish|powershell>" >&2
+        exit 1
+        ;;
     completions)
         SHELL_NAME="$2"
         if [ -z "$SHELL_NAME" ]; then
@@ -237,7 +242,7 @@ _wt()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    local subs="add remove rm list go version completions"
+    local subs="add remove rm list go run version completions"
     if [ $COMP_CWORD -eq 1 ]; then
         COMPREPLY=( $(compgen -W "$subs" -- "$cur") )
         return 0
@@ -252,7 +257,7 @@ _wt()
                 COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             fi
             ;;
-        go|add)
+        go|add|run)
             local names
             names=$(ls .wt/worktrees 2>/dev/null)
             COMPREPLY=( $(compgen -W "$names" -- "$cur") )
@@ -276,6 +281,7 @@ subcommands=(
   'rm:Alias of remove'
   'list:List worktrees'
   'go:Create or navigate to worktree'
+  'run:Run command in worktree'
   'version:Show version'
   'completions:Generate shell completion script'
 )
@@ -291,7 +297,7 @@ case $state in
       remove|rm)
         _arguments '2:worktree:->names'
         ;&
-      go|add)
+      go|add|run)
         _arguments '2:worktree:->names'
         ;&
       completions)
@@ -316,6 +322,7 @@ complete -c wt -n '__fish_use_subcommand' -a remove -d 'Remove a worktree'
 complete -c wt -n '__fish_use_subcommand' -a rm -d 'Alias of remove'
 complete -c wt -n '__fish_use_subcommand' -a list -d 'List worktrees'
 complete -c wt -n '__fish_use_subcommand' -a go -d 'Create or navigate to worktree'
+complete -c wt -n '__fish_use_subcommand' -a run -d 'Run command in worktree'
 complete -c wt -n '__fish_use_subcommand' -a version -d 'Show version'
 complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell completion script'
 # remove flags
