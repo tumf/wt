@@ -206,9 +206,24 @@ EOF
         mkdir -p .wt/worktrees
 
         # Check if worktree already exists
+        WORKTREE_EXISTS=false
+        IS_PRUNABLE=false
+        
         if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
-            echo "Worktree '$NAME' exists, navigating to it"
-        else
+            WORKTREE_EXISTS=true
+            # Check if it's prunable (directory doesn't exist)
+            if [ ! -d "$WORKTREE_DIR" ]; then
+                IS_PRUNABLE=true
+                echo "Worktree '$NAME' is marked as prunable, removing stale entry"
+                git worktree remove "$WORKTREE_DIR" 2>/dev/null || true
+                git worktree prune 2>/dev/null || true
+            else
+                echo "Worktree '$NAME' exists, navigating to it"
+            fi
+        fi
+        
+        # If worktree doesn't exist or was prunable, create it
+        if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
             echo "Worktree '$NAME' does not exist, creating it first"
 
             # Check if branch exists
@@ -240,12 +255,12 @@ EOF
                 ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
                 echo "Setup script completed"
             fi
-        fi
-
-        # Ensure symlink exists for completions
-        if [ ! -e "$SYMLINK_PATH" ]; then
-            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
-            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+        else
+            # Worktree exists and is not prunable, just ensure symlink exists
+            if [ ! -e "$SYMLINK_PATH" ]; then
+                ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+                echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+            fi
         fi
 
         # Change to worktree directory
