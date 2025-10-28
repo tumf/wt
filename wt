@@ -72,11 +72,6 @@ EOF
         echo "Created worktree at $WORKTREE_DIR"
         echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-        # Remove setup from worktree (it's only needed in parent repository)
-        if [ -f "$WORKTREE_DIR/.wt/setup" ]; then
-            rm "$WORKTREE_DIR/.wt/setup"
-        fi
-
         # Run setup script if it exists in project (from parent repository)
         if [ -f ".wt/setup" ]; then
             echo "Running setup script..."
@@ -243,11 +238,6 @@ EOF
             ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
             echo "Created worktree at $WORKTREE_DIR"
             echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
-
-            # Remove setup from worktree (it's only needed in parent repository)
-            if [ -f "$WORKTREE_DIR/.wt/setup" ]; then
-                rm "$WORKTREE_DIR/.wt/setup"
-            fi
 
             # Run setup script if it exists in project (from parent repository)
             if [ -f ".wt/setup" ]; then
