@@ -30,7 +30,6 @@ case "$1" in
             cat > .wt/.gitignore << 'EOF'
 worktrees
 *.local
-setup
 EOF
         fi
 
@@ -73,14 +72,15 @@ EOF
         echo "Created worktree at $WORKTREE_DIR"
         echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-        # Copy setup script to worktree if it exists in project
-        if [ -f ".wt/setup" ]; then
-            mkdir -p "$WORKTREE_DIR/.wt"
-            cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
-            chmod +x "$WORKTREE_DIR/.wt/setup"
+        # Remove setup from worktree (it's only needed in parent repository)
+        if [ -f "$WORKTREE_DIR/.wt/setup" ]; then
+            rm "$WORKTREE_DIR/.wt/setup"
+        fi
 
+        # Run setup script if it exists in project (from parent repository)
+        if [ -f ".wt/setup" ]; then
             echo "Running setup script..."
-            ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
+            ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
             echo "Setup script completed"
         fi
         ;;
@@ -189,7 +189,6 @@ EOF
             cat > .wt/.gitignore << 'EOF'
 worktrees
 *.local
-setup
 EOF
         fi
 
@@ -245,14 +244,15 @@ EOF
             echo "Created worktree at $WORKTREE_DIR"
             echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-            # Copy setup script to worktree if it exists in project
-            if [ -f ".wt/setup" ]; then
-                mkdir -p "$WORKTREE_DIR/.wt"
-                cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
-                chmod +x "$WORKTREE_DIR/.wt/setup"
+            # Remove setup from worktree (it's only needed in parent repository)
+            if [ -f "$WORKTREE_DIR/.wt/setup" ]; then
+                rm "$WORKTREE_DIR/.wt/setup"
+            fi
 
+            # Run setup script if it exists in project (from parent repository)
+            if [ -f ".wt/setup" ]; then
                 echo "Running setup script..."
-                ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
+                ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
                 echo "Setup script completed"
             fi
         else
