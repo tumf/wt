@@ -170,7 +170,8 @@ remove | rm)
   fi
 
   # Remove symlink since worktree removal was successful
-  if [ -e "$SYMLINK_PATH" ]; then
+  # Use -L to check for symlink existence (works even if broken)
+  if [ -L "$SYMLINK_PATH" ] || [ -e "$SYMLINK_PATH" ]; then
     rm "$SYMLINK_PATH"
     echo "Removed symlink $SYMLINK_PATH"
   fi
