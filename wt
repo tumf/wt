@@ -253,13 +253,13 @@ _wt()
                 COMPREPLY=( $(compgen -W "--force -f" -- "$cur") )
             else
                 local names
-                names=$(ls .wt/worktrees 2>/dev/null)
+                names=$(command ls -1 .wt/worktrees 2>/dev/null)
                 COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             fi
             ;;
         go|add|run)
             local names
-            names=$(ls .wt/worktrees 2>/dev/null)
+            names=$(command ls -1 .wt/worktrees 2>/dev/null)
             COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             ;;
         completions)
@@ -306,7 +306,7 @@ case $state in
     esac
     case $state in
       names)
-        _values 'worktree' $(ls .wt/worktrees 2>/dev/null)
+        _values 'worktree' $(command ls -1 .wt/worktrees 2>/dev/null)
         ;;
     esac
     ;;
@@ -329,10 +329,11 @@ complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell comp
 complete -c wt -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
 complete -c wt -n '__fish_seen_subcommand_from rm' -s f -l force -d 'Force removal'
 # worktree names for relevant subcommands
-complete -c wt -n '__fish_seen_subcommand_from go' -a '(ls .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from add' -a '(ls .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from remove' -a '(ls .wt/worktrees 2>/dev/null)'
-complete -c wt -n '__fish_seen_subcommand_from rm' -a '(ls .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from go' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from add' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from remove' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from rm' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
+complete -c wt -n '__fish_seen_subcommand_from run' -a '(command ls -1 .wt/worktrees 2>/dev/null)'
 # shells for completions
 complete -c wt -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish powershell'
 EOF
