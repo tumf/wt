@@ -32,6 +32,38 @@ Creates a worktree if needed and navigates to it.
 # Creates worktree if missing, then provides navigation guidance
 ```
 
+### `./wt run <name> -- <command>`
+
+Creates a worktree if needed and runs a command in it.
+
+```bash
+./wt run feature-login -- git status
+./wt run feature-login -- npm install
+./wt run feature-login -- npm test
+```
+
+**Advanced Example: Create tmux window and open Claude Code**
+
+```bash
+# Run tmux commands to create a new window and open Claude Code
+./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Or create tmux session if it doesn't exist
+./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# If already inside a tmux session, use detach and create new session
+# Option 1: Unset TMUX variable temporarily
+TMUX= ./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Option 2: Add a new window to the current tmux session
+./wt run feature-auth -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+```
+
+**What happens:**
+1. Checks if worktree exists - creates it using `add` logic if missing
+2. Runs command in the worktree directory
+3. Returns to the original directory after command completes
+
 ## 📦 Installation
 
 1. **Download script** to your project root:
@@ -50,12 +82,15 @@ Creates a worktree if needed and navigates to it.
 ```bash
    chmod +x wt
    ```
+
  
+
 ## 🔁 Shell Completions
 
-`wt` can generate shell completion scripts with `./wt completions <bash|zsh|fish|powershell>`. Install the output for your shell to enable subcommand and argument hints:
+`wt` can generate shell completion scripts with `./wt completions <bash|zsh|fish|powershell>` . Install the output for your shell to enable subcommand and argument hints:
 
 ### Bash
+
 ```bash
 # User-level install (ensure directory exists)
 mkdir -p ~/.local/share/bash-completion/completions
@@ -64,9 +99,11 @@ mkdir -p ~/.local/share/bash-completion/completions
 # System-wide alternative (requires sudo)
 # sudo ./wt completions bash > /etc/bash_completion.d/wt
 ```
+
 Reload your shell or run `source ~/.bashrc` to activate.
 
 ### Zsh
+
 ```bash
 mkdir -p ~/.zsh/completions
 ./wt completions zsh > ~/.zsh/completions/_wt
@@ -76,16 +113,20 @@ if ! grep -q 'fpath+=(~/.zsh/completions)' ~/.zshrc; then
   echo 'fpath+=(~/.zsh/completions)' >> ~/.zshrc
 fi
 ```
-Then restart your shell or run `autoload -Uz compinit && compinit`.
+
+Then restart your shell or run `autoload -Uz compinit && compinit` .
 
 ### Fish
+
 ```bash
 mkdir -p ~/.config/fish/completions
 ./wt completions fish > ~/.config/fish/completions/wt.fish
 ```
+
 New shells will pick up the completion automatically.
 
 ### PowerShell (pwsh)
+
 ```powershell
 # Apply to the current session
 ./wt completions powershell | Out-String | Invoke-Expression
@@ -94,10 +135,10 @@ New shells will pick up the completion automatically.
 ./wt completions powershell > "$HOME/.config/powershell/completions/wt.ps1"
 Add-Content -Path "$HOME/.config/powershell/Microsoft.PowerShell_profile.ps1" -Value "& '$HOME/.config/powershell/completions/wt.ps1'"  # once
 ```
+
 Restart PowerShell after updating your profile.
 
 ## 🎯 Why Use wt?
-
 
 Managing git worktrees manually can be cumbersome. `wt` simplifies this by:
 
@@ -162,6 +203,35 @@ Creates a worktree if needed and navigates to it.
 1. Checks if worktree exists - creates it using `add` logic if missing
 2. Provides navigation guidance to worktree directory
 3. Runs setup script if creating new worktree
+
+### `./wt run <name> -- <command>`
+
+Creates a worktree if needed and runs a command in it.
+
+```bash
+./wt run feature-login -- git status
+./wt run feature-login -- npm install
+./wt run bugfix-123 -- make test
+
+# Create tmux window and open Claude Code in the worktree
+./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Create tmux session if it doesn't exist, then add window
+./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# If already inside a tmux session (to avoid "sessions should be nested" error)
+# Option 1: Temporarily unset TMUX variable
+TMUX= ./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Option 2: Add window to current tmux session (recommended)
+./wt run feature-auth -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-auth -c "$(pwd)" \; send-keys "claude 'refactor the codes'" Enter'
+```
+
+**What happens:**
+1. Checks if worktree exists - creates it using `add` logic if missing
+2. Runs the command in the worktree directory
+3. Returns to the original directory after command completes
+4. Runs setup script if creating new worktree
 
 ### `./wt version`
 
@@ -330,6 +400,28 @@ cd .wt/worktrees/feature-auth      # Work on auth
 cd .wt/worktrees/feature-dashboard # Work on dashboard
 ```
 
+### Running Commands in Worktrees
+
+```bash
+# Run tests across different worktrees
+./wt run feature-auth -- npm test
+./wt run bugfix-123 -- make test
+
+# Open Claude Code in tmux window for a worktree
+./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Create tmux session and open multiple worktrees
+./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+./wt run feature-dashboard -- bash -c 'tmux new-window -t dev -n feature-dashboard -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# If already inside a tmux session (to avoid "sessions should be nested" error)
+# Option 1: Temporarily unset TMUX variable
+TMUX= ./wt run feature-auth -- bash -c 'tmux new-session -d -s dev 2>/dev/null || true; tmux new-window -t dev -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Option 2: Add window to current tmux session
+./wt run feature-auth -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-auth -c "$(pwd)" \; send-keys "cursor code ." Enter'
+```
+
 ### Version Management Workflow
 
 ```bash
@@ -398,6 +490,18 @@ rm .wt/worktrees/<name>
 # Remove all wt-managed worktrees
 rm -rf .wt/
 git worktree prune
+```
+
+### "sessions should be nested with care, unset \$TMUX to force"
+
+This error occurs when you're already inside a tmux session and trying to run tmux commands in a worktree. Solutions:
+
+```bash
+# Option 1: Temporarily unset TMUX variable
+TMUX= ./wt run feature-name -- bash -c 'tmux new-window -n feature-name -c "$(pwd)" \; send-keys "cursor code ." Enter'
+
+# Option 2: Add window to current tmux session (recommended)
+./wt run feature-name -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-name -c "$(pwd)" \; send-keys "cursor code ." Enter'
 ```
 
 ## 🔒 Security

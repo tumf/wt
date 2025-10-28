@@ -12,6 +12,23 @@ DIR_NAME=$(basename "$(pwd)")
 # Default worktree directory
 TMP_DIR="${HOME}/.wt/worktrees"
 
+# Function to run setup script in worktree if it's a new worktree
+run_setup_if_new() {
+  local worktree_dir="$1"
+  local is_new="$2"
+  local root_path="$3"
+
+  # Only run setup for newly created worktrees
+  if [ "$is_new" = "true" ]; then
+    # Run setup script if it exists in worktree
+    if [ -f "$worktree_dir/.wt/setup" ]; then
+      echo "Running setup script in worktree..."
+      (cd "$worktree_dir" && ROOT_WORKTREE_PATH="$root_path" bash .wt/setup)
+      echo "Setup script completed"
+    fi
+  fi
+}
+
 case "$1" in
 add)
   if [ -z "$2" ]; then
@@ -72,12 +89,9 @@ EOF
   echo "Created worktree at $WORKTREE_DIR"
   echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-  # Run setup script if it exists in project (from parent repository)
-  if [ -f ".wt/setup" ]; then
-    echo "Running setup script..."
-    ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
-    echo "Setup script completed"
-  fi
+  # Run setup script if it exists in worktree
+  ROOT_PATH="$(pwd)"
+  run_setup_if_new "$WORKTREE_DIR" "true" "$ROOT_PATH"
   ;;
 remove | rm)
   FORCE_FLAG=""
@@ -239,12 +253,9 @@ EOF
     echo "Created worktree at $WORKTREE_DIR"
     echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-    # Run setup script if it exists in project (from parent repository)
-    if [ -f ".wt/setup" ]; then
-      echo "Running setup script..."
-      ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
-      echo "Setup script completed"
-    fi
+    # Run setup script if it exists in worktree (only for newly created worktrees)
+    ROOT_PATH="$(pwd)"
+    run_setup_if_new "$WORKTREE_DIR" "true" "$ROOT_PATH"
   else
     # Worktree exists and is not prunable, just ensure symlink exists
     if [ ! -e "$SYMLINK_PATH" ]; then
@@ -303,9 +314,24 @@ EOF
   mkdir -p .wt/worktrees
 
   # Check if worktree already exists
+  WORKTREE_EXISTS=false
+  IS_PRUNABLE=false
+
   if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
-    echo "Worktree '$NAME' exists, running command in it"
-  else
+    WORKTREE_EXISTS=true
+    # Check if it's prunable (directory doesn't exist)
+    if [ ! -d "$WORKTREE_DIR" ]; then
+      IS_PRUNABLE=true
+      echo "Worktree '$NAME' is marked as prunable, removing stale entry"
+      git worktree remove "$WORKTREE_DIR" 2>/dev/null || true
+      git worktree prune 2>/dev/null || true
+    else
+      echo "Worktree '$NAME' exists, running command in it"
+    fi
+  fi
+
+  # If worktree doesn't exist or was prunable, create it
+  if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
     echo "Worktree '$NAME' does not exist, creating it first"
 
     # Check if branch exists
@@ -319,24 +345,17 @@ EOF
 
     # Create symlink in .wt/worktrees directory
     if [ -e "$SYMLINK_PATH" ]; then
-      echo "Symlink already exists at $SYMLINK_PATH"
-      exit 1
+      echo "Symlink already exists at $SYMLINK_PATH, removing old symlink"
+      rm "$SYMLINK_PATH"
     fi
 
     ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
     echo "Created worktree at $WORKTREE_DIR"
     echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-    # Copy setup script to worktree if it exists in project
-    if [ -f ".wt/setup" ]; then
-      mkdir -p "$WORKTREE_DIR/.wt"
-      cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
-      chmod +x "$WORKTREE_DIR/.wt/setup"
-
-      echo "Running setup script..."
-      ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
-      echo "Setup script completed"
-    fi
+    # Run setup script if it exists in worktree (only for newly created worktrees)
+    ROOT_PATH="$(pwd)"
+    run_setup_if_new "$WORKTREE_DIR" "true" "$ROOT_PATH"
   fi
 
   # Store current directory and execute command in worktree
@@ -389,18 +408,32 @@ _wt()
                 COMPREPLY=( $(compgen -W "--force -f" -- "$cur") )
             else
                 local names
-                names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
+                # Find git repository root
+                local git_root
+                git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+                # Try to get names from .wt/worktrees directory first
+                if [ -n "$git_root" ] && [ -d "$git_root/.wt/worktrees" ]; then
+                    names=$(command ls -1 "$git_root/.wt/worktrees" 2>/dev/null | sort -u)
+                fi
+                # Fallback to git worktree list
                 if [ -z "$names" ]; then
-                    names=$(command ls -1 .wt/worktrees 2>/dev/null)
+                    names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
                 fi
                 COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             fi
             ;;
         go|add|run)
             local names
-            names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
+            # Find git repository root
+            local git_root
+            git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+            # Try to get names from .wt/worktrees directory first
+            if [ -n "$git_root" ] && [ -d "$git_root/.wt/worktrees" ]; then
+                names=$(command ls -1 "$git_root/.wt/worktrees" 2>/dev/null | sort -u)
+            fi
+            # Fallback to git worktree list
             if [ -z "$names" ]; then
-                names=$(command ls -1 .wt/worktrees 2>/dev/null)
+                names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
             fi
             COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             ;;
@@ -420,9 +453,17 @@ EOF
 local -a names
 
 _wt_get_worktrees() {
-  names=(${(f)"$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)"})
+  # Find git repository root
+  local git_root
+  git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+  
+  # Try to get names from .wt/worktrees directory first
+  if [[ -n "$git_root" ]] && [[ -d "$git_root/.wt/worktrees" ]]; then
+    names=(${(f)"$(command ls -1 "$git_root/.wt/worktrees" 2>/dev/null)"})
+  fi
+  # Fallback to git worktree list
   if [[ ${#names} -eq 0 ]]; then
-    names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
+    names=(${(f)"$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)"})
   fi
 }
 
@@ -470,15 +511,27 @@ complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell comp
 complete -c wt -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
 complete -c wt -n '__fish_seen_subcommand_from rm' -s f -l force -d 'Force removal'
 # worktree names for relevant subcommands
-set -l __wt_names (git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
-if test -z "$__wt_names"
-    set __wt_names (command ls -1 .wt/worktrees 2>/dev/null)
+# Define completion function for worktree names
+function __wt_get_names
+    # Find git repository root
+    set -l git_root (git rev-parse --show-toplevel 2>/dev/null)
+    set -l names
+    # Try to get names from .wt/worktrees directory first
+    if test -n "$git_root" && test -d "$git_root/.wt/worktrees"
+        set names (command ls -1 "$git_root/.wt/worktrees" 2>/dev/null | sort -u)
+    end
+    # Fallback to git worktree list
+    if test -z "$names"
+        set names (git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
+    end
+    printf '%s\n' $names
 end
-complete -c wt -n '__fish_seen_subcommand_from go' -a "$__wt_names"
-complete -c wt -n '__fish_seen_subcommand_from add' -a "$__wt_names"
-complete -c wt -n '__fish_seen_subcommand_from remove' -a "$__wt_names"
-complete -c wt -n '__fish_seen_subcommand_from rm' -a "$__wt_names"
-complete -c wt -n '__fish_seen_subcommand_from run' -a "$__wt_names"
+
+complete -c wt -n '__fish_seen_subcommand_from go' -a '(__wt_get_names)'
+complete -c wt -n '__fish_seen_subcommand_from add' -a '(__wt_get_names)'
+complete -c wt -n '__fish_seen_subcommand_from remove' -a '(__wt_get_names)'
+complete -c wt -n '__fish_seen_subcommand_from rm' -a '(__wt_get_names)'
+complete -c wt -n '__fish_seen_subcommand_from run' -a '(__wt_get_names)'
 # shells for completions
 complete -c wt -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish powershell'
 EOF
