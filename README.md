@@ -484,26 +484,6 @@ rm .wt/worktrees/<name>
 ./wt add <name>
 ```
 
-### Clean up after system crash
-
-```bash
-# Remove all wt-managed worktrees
-rm -rf .wt/
-git worktree prune
-```
-
-### "sessions should be nested with care, unset \$TMUX to force"
-
-This error occurs when you're already inside a tmux session and trying to run tmux commands in a worktree. Solutions:
-
-```bash
-# Option 1: Temporarily unset TMUX variable
-TMUX= ./wt run feature-name -- bash -c 'tmux new-window -n feature-name -c "$(pwd)" \; send-keys "cursor code ." Enter'
-
-# Option 2: Add window to current tmux session (recommended)
-./wt run feature-name -- bash -c 'tmux new-window -t ${TMUX#*,} -n feature-name -c "$(pwd)" \; send-keys "cursor code ." Enter'
-```
-
 ## 🔒 Security
 
 The `wt` script:
