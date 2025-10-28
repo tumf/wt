@@ -287,15 +287,17 @@ EOF
                 cat <<'EOF'
 #compdef wt ./wt
 
-local curcontext="$curcontext" state line
-typeset -A opt_args
+local -a names
 
-_arguments \
-  '1: :->command' \
-  '*:: :->arg'
+_wt_get_worktrees() {
+  names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
+  if [[ ${#names} -eq 0 ]]; then
+    names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
+  fi
+}
 
-case $state in
-  command)
+case $CURRENT in
+  1)
     local -a subcommands
     subcommands=(
       'add:Add a worktree'
@@ -307,25 +309,13 @@ case $state in
       'version:Show version'
       'completions:Generate shell completion script'
     )
-    _describe -t commands 'command' subcommands
+    _describe 'command' subcommands
     ;;
-  arg)
+  2)
     case $words[2] in
-      remove|rm)
-        local -a names
-        names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
-        if [[ ${#names} -eq 0 ]]; then
-          names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
-        fi
-        _values 'worktree' $names
-        ;;
-      go|add|run)
-        local -a names
-        names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
-        if [[ ${#names} -eq 0 ]]; then
-          names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
-        fi
-        _values 'worktree' $names
+      add|go|remove|rm|run)
+        _wt_get_worktrees
+        _describe 'worktree' names
         ;;
       completions)
         _values 'shell' bash zsh fish powershell
