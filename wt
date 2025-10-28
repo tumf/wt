@@ -13,364 +13,364 @@ DIR_NAME=$(basename "$(pwd)")
 TMP_DIR="${HOME}/.wt/worktrees"
 
 case "$1" in
-    add)
-        if [ -z "$2" ]; then
-            echo "Usage: $0 add <name>"
-            exit 1
-        fi
+add)
+  if [ -z "$2" ]; then
+    echo "Usage: $0 add <name>"
+    exit 1
+  fi
 
-        NAME="$2"
-        # Sanitize branch name for directory use (replace / and other invalid chars with _)
-        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+  NAME="$2"
+  # Sanitize branch name for directory use (replace / and other invalid chars with _)
+  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
 
-        # Create .wt directory and .gitignore if they don't exist
-        if [ ! -d ".wt" ]; then
-            mkdir -p .wt
-            cat > .wt/.gitignore << 'EOF'
+  # Create .wt directory and .gitignore if they don't exist
+  if [ ! -d ".wt" ]; then
+    mkdir -p .wt
+    cat >.wt/.gitignore <<'EOF'
 worktrees
 *.local
 EOF
-        fi
+  fi
 
-        # Create .wt/setup template if it doesn't exist
-        if [ ! -f ".wt/setup" ]; then
-            cat > .wt/setup << 'EOF'
+  # Create .wt/setup template if it doesn't exist
+  if [ ! -f ".wt/setup" ]; then
+    cat >.wt/setup <<'EOF'
 #! /bin/bash
 # $ROOT_WORKTREE_PATH is path to the base repository (source tree)
 if [ -f .wt/setup.local ]; then
   source .wt/setup.local
 fi
 EOF
-        fi
+  fi
 
-        mkdir -p .wt/worktrees
+  mkdir -p .wt/worktrees
 
-        # Check if worktree already exists
-        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
-            echo "Worktree already exists at $WORKTREE_DIR"
-            exit 1
-        fi
+  # Check if worktree already exists
+  if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+    echo "Worktree already exists at $WORKTREE_DIR"
+    exit 1
+  fi
 
-        # Check if branch exists
-        if git branch --list "$NAME" | grep -q "$NAME"; then
-            echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-            git worktree add "$WORKTREE_DIR" "$NAME"
-        else
-            echo "Creating new branch '$NAME' and adding worktree."
-            git worktree add "$WORKTREE_DIR" -b "$NAME"
-        fi
+  # Check if branch exists
+  if git branch --list "$NAME" | grep -q "$NAME"; then
+    echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+    git worktree add "$WORKTREE_DIR" "$NAME"
+  else
+    echo "Creating new branch '$NAME' and adding worktree."
+    git worktree add "$WORKTREE_DIR" -b "$NAME"
+  fi
 
-        # Create symlink in .wt/worktrees directory
-        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
-        if [ -e "$SYMLINK_PATH" ]; then
-            echo "Symlink already exists at $SYMLINK_PATH"
-            exit 1
-        fi
+  # Create symlink in .wt/worktrees directory
+  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+  if [ -e "$SYMLINK_PATH" ]; then
+    echo "Symlink already exists at $SYMLINK_PATH"
+    exit 1
+  fi
 
-        ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
-        echo "Created worktree at $WORKTREE_DIR"
-        echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+  ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+  echo "Created worktree at $WORKTREE_DIR"
+  echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-        # Run setup script if it exists in project (from parent repository)
-        if [ -f ".wt/setup" ]; then
-            echo "Running setup script..."
-            ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
-            echo "Setup script completed"
-        fi
-        ;;
-    remove|rm)
-        FORCE_FLAG=""
-        NAME=""
-        
-        # Parse arguments
-        while [ $# -gt 1 ]; do
-            case "$2" in
-                -f|--force)
-                    FORCE_FLAG="-f"
-                    shift
-                    ;;
-                *)
-                    if [ -z "$NAME" ]; then
-                        NAME="$2"
-                    fi
-                    shift
-                    ;;
-            esac
-        done
+  # Run setup script if it exists in project (from parent repository)
+  if [ -f ".wt/setup" ]; then
+    echo "Running setup script..."
+    ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
+    echo "Setup script completed"
+  fi
+  ;;
+remove | rm)
+  FORCE_FLAG=""
+  NAME=""
 
-        if [ -z "$NAME" ]; then
-            echo "Usage: $0 remove [-f|--force] <name>"
-            exit 1
-        fi
-
-        # Sanitize branch name for directory use (replace / and other invalid chars with _)
-        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
-        
-        # Debug: show what we're checking
-        if [ ! -e "$SYMLINK_PATH" ]; then
-            # Check if it's a broken symlink
-            if [ -L "$SYMLINK_PATH" ]; then
-                echo "Found broken symlink at $SYMLINK_PATH"
-                rm "$SYMLINK_PATH"
-                echo "Removed broken symlink"
-                exit 0
-            else
-                echo "Worktree '$NAME' not found at $SYMLINK_PATH"
-                exit 1
-            fi
-        fi
-
-        # Get actual worktree path
-        ACTUAL_WORKTREE_DIR=$(readlink -f "$SYMLINK_PATH" 2>/dev/null)
-        
-        # If symlink exists but worktree directory doesn't exist, just remove the symlink
-        if [ -z "$ACTUAL_WORKTREE_DIR" ] || [ ! -e "$ACTUAL_WORKTREE_DIR" ]; then
-            echo "Worktree directory not found, removing orphaned symlink"
-            rm "$SYMLINK_PATH"
-            echo "Removed orphaned symlink $SYMLINK_PATH"
-            exit 0
-        fi
-
-        # Remove worktree using git
-        echo "Removing worktree at $ACTUAL_WORKTREE_DIR"
-        if [ -n "$FORCE_FLAG" ]; then
-            if ! git worktree remove -f "$ACTUAL_WORKTREE_DIR"; then
-                echo "Failed to remove worktree"
-                exit 1
-            fi
-        else
-            if ! git worktree remove "$ACTUAL_WORKTREE_DIR"; then
-                echo "Failed to remove worktree (may contain modified files)"
-                echo "Use --force flag to force removal"
-                exit 1
-            fi
-        fi
-        
-        # Verify worktree directory is gone
-        if [ -e "$ACTUAL_WORKTREE_DIR" ]; then
-            echo "Worktree still exists at $ACTUAL_WORKTREE_DIR"
-            echo "Worktree not removed completely"
-            exit 1
-        fi
-        
-        # Remove symlink since worktree removal was successful
-        if [ -e "$SYMLINK_PATH" ]; then
-            rm "$SYMLINK_PATH"
-            echo "Removed symlink $SYMLINK_PATH"
-        fi
-        
-        echo "Worktree removed successfully"
-        ;;
-    list)
-        git worktree list
-        ;;
-    go)
-        if [ -z "$2" ]; then
-            echo "Usage: $0 go <name>"
-            exit 1
-        fi
-
+  # Parse arguments
+  while [ $# -gt 1 ]; do
+    case "$2" in
+    -f | --force)
+      FORCE_FLAG="-f"
+      shift
+      ;;
+    *)
+      if [ -z "$NAME" ]; then
         NAME="$2"
-        # Sanitize branch name for directory use (replace / and other invalid chars with _)
-        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
-        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+      fi
+      shift
+      ;;
+    esac
+  done
 
-        # Create .wt directory and .gitignore if they don't exist
-        if [ ! -d ".wt" ]; then
-            mkdir -p .wt
-            cat > .wt/.gitignore << 'EOF'
+  if [ -z "$NAME" ]; then
+    echo "Usage: $0 remove [-f|--force] <name>"
+    exit 1
+  fi
+
+  # Sanitize branch name for directory use (replace / and other invalid chars with _)
+  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+
+  # Debug: show what we're checking
+  if [ ! -e "$SYMLINK_PATH" ]; then
+    # Check if it's a broken symlink
+    if [ -L "$SYMLINK_PATH" ]; then
+      echo "Found broken symlink at $SYMLINK_PATH"
+      rm "$SYMLINK_PATH"
+      echo "Removed broken symlink"
+      exit 0
+    else
+      echo "Worktree '$NAME' not found at $SYMLINK_PATH"
+      exit 1
+    fi
+  fi
+
+  # Get actual worktree path
+  ACTUAL_WORKTREE_DIR=$(readlink -f "$SYMLINK_PATH" 2>/dev/null)
+
+  # If symlink exists but worktree directory doesn't exist, just remove the symlink
+  if [ -z "$ACTUAL_WORKTREE_DIR" ] || [ ! -e "$ACTUAL_WORKTREE_DIR" ]; then
+    echo "Worktree directory not found, removing orphaned symlink"
+    rm "$SYMLINK_PATH"
+    echo "Removed orphaned symlink $SYMLINK_PATH"
+    exit 0
+  fi
+
+  # Remove worktree using git
+  echo "Removing worktree at $ACTUAL_WORKTREE_DIR"
+  if [ -n "$FORCE_FLAG" ]; then
+    if ! git worktree remove -f "$ACTUAL_WORKTREE_DIR"; then
+      echo "Failed to remove worktree"
+      exit 1
+    fi
+  else
+    if ! git worktree remove "$ACTUAL_WORKTREE_DIR"; then
+      echo "Failed to remove worktree (may contain modified files)"
+      echo "Use --force flag to force removal"
+      exit 1
+    fi
+  fi
+
+  # Verify worktree directory is gone
+  if [ -e "$ACTUAL_WORKTREE_DIR" ]; then
+    echo "Worktree still exists at $ACTUAL_WORKTREE_DIR"
+    echo "Worktree not removed completely"
+    exit 1
+  fi
+
+  # Remove symlink since worktree removal was successful
+  if [ -e "$SYMLINK_PATH" ]; then
+    rm "$SYMLINK_PATH"
+    echo "Removed symlink $SYMLINK_PATH"
+  fi
+
+  echo "Worktree removed successfully"
+  ;;
+list)
+  git worktree list
+  ;;
+go)
+  if [ -z "$2" ]; then
+    echo "Usage: $0 go <name>"
+    exit 1
+  fi
+
+  NAME="$2"
+  # Sanitize branch name for directory use (replace / and other invalid chars with _)
+  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+
+  # Create .wt directory and .gitignore if they don't exist
+  if [ ! -d ".wt" ]; then
+    mkdir -p .wt
+    cat >.wt/.gitignore <<'EOF'
 worktrees
 *.local
 EOF
-        fi
+  fi
 
-        # Create .wt/setup template if it doesn't exist
-        if [ ! -f ".wt/setup" ]; then
-            cat > .wt/setup << 'EOF'
+  # Create .wt/setup template if it doesn't exist
+  if [ ! -f ".wt/setup" ]; then
+    cat >.wt/setup <<'EOF'
 #! /bin/bash
 # wt - Git Worktree Management Tool
 # https://github.com/tumf/wt
 # $ROOT_WORKTREE_PATH is path to the base repository (source tree)
 EOF
-        fi
+  fi
 
-        mkdir -p .wt/worktrees
+  mkdir -p .wt/worktrees
 
-        # Check if worktree already exists
-        WORKTREE_EXISTS=false
-        IS_PRUNABLE=false
-        
-        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
-            WORKTREE_EXISTS=true
-            # Check if it's prunable (directory doesn't exist)
-            if [ ! -d "$WORKTREE_DIR" ]; then
-                IS_PRUNABLE=true
-                echo "Worktree '$NAME' is marked as prunable, removing stale entry"
-                git worktree remove "$WORKTREE_DIR" 2>/dev/null || true
-                git worktree prune 2>/dev/null || true
-            else
-                echo "Worktree '$NAME' exists, navigating to it"
-            fi
-        fi
-        
-        # If worktree doesn't exist or was prunable, create it
-        if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
-            echo "Worktree '$NAME' does not exist, creating it first"
+  # Check if worktree already exists
+  WORKTREE_EXISTS=false
+  IS_PRUNABLE=false
 
-            # Check if branch exists
-            if git branch --list "$NAME" | grep -q "$NAME"; then
-                echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-                git worktree add "$WORKTREE_DIR" "$NAME"
-            else
-                echo "Creating new branch '$NAME' and adding worktree."
-                git worktree add "$WORKTREE_DIR" -b "$NAME"
-            fi
+  if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+    WORKTREE_EXISTS=true
+    # Check if it's prunable (directory doesn't exist)
+    if [ ! -d "$WORKTREE_DIR" ]; then
+      IS_PRUNABLE=true
+      echo "Worktree '$NAME' is marked as prunable, removing stale entry"
+      git worktree remove "$WORKTREE_DIR" 2>/dev/null || true
+      git worktree prune 2>/dev/null || true
+    else
+      echo "Worktree '$NAME' exists, navigating to it"
+    fi
+  fi
 
-            # Create symlink in .wt/worktrees directory
-            if [ -e "$SYMLINK_PATH" ]; then
-                echo "Symlink already exists at $SYMLINK_PATH, removing old symlink"
-                rm "$SYMLINK_PATH"
-            fi
+  # If worktree doesn't exist or was prunable, create it
+  if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
+    echo "Worktree '$NAME' does not exist, creating it first"
 
-            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
-            echo "Created worktree at $WORKTREE_DIR"
-            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+    # Check if branch exists
+    if git branch --list "$NAME" | grep -q "$NAME"; then
+      echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+      git worktree add "$WORKTREE_DIR" "$NAME"
+    else
+      echo "Creating new branch '$NAME' and adding worktree."
+      git worktree add "$WORKTREE_DIR" -b "$NAME"
+    fi
 
-            # Run setup script if it exists in project (from parent repository)
-            if [ -f ".wt/setup" ]; then
-                echo "Running setup script..."
-                ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
-                echo "Setup script completed"
-            fi
-        else
-            # Worktree exists and is not prunable, just ensure symlink exists
-            if [ ! -e "$SYMLINK_PATH" ]; then
-                ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
-                echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
-            fi
-        fi
+    # Create symlink in .wt/worktrees directory
+    if [ -e "$SYMLINK_PATH" ]; then
+      echo "Symlink already exists at $SYMLINK_PATH, removing old symlink"
+      rm "$SYMLINK_PATH"
+    fi
 
-        # Change to worktree directory
-        echo "Changing to worktree directory: $WORKTREE_DIR"
-        cd "$WORKTREE_DIR" && $SHELL
-        ;;
-    run)
-        if [ -z "$2" ]; then
-            echo "Usage: $0 run <name> -- <command>"
-            exit 1
-        fi
+    ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+    echo "Created worktree at $WORKTREE_DIR"
+    echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-        NAME="$2"
-        
-        # Check if -- delimiter exists and extract command
-        if [ "$3" != "--" ]; then
-            echo "Usage: $0 run <name> -- <command>"
-            exit 1
-        fi
-        
-        if [ -z "$4" ]; then
-            echo "Usage: $0 run <name> -- <command>"
-            exit 1
-        fi
-        
-        # Extract command arguments (everything after --)
-        COMMAND_ARGS="${@:4}"
-        # Sanitize branch name for directory use (replace / and other invalid chars with _)
-        SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-        WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
-        SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+    # Run setup script if it exists in project (from parent repository)
+    if [ -f ".wt/setup" ]; then
+      echo "Running setup script..."
+      ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
+      echo "Setup script completed"
+    fi
+  else
+    # Worktree exists and is not prunable, just ensure symlink exists
+    if [ ! -e "$SYMLINK_PATH" ]; then
+      ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+      echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+    fi
+  fi
 
-        # Create .wt directory and .gitignore if they don't exist
-        if [ ! -d ".wt" ]; then
-            mkdir -p .wt
-            echo "worktrees" > .wt/.gitignore
-            echo "*.local" > .wt/.gitignore
-        fi
+  # Change to worktree directory
+  echo "Changing to worktree directory: $WORKTREE_DIR"
+  cd "$WORKTREE_DIR" && $SHELL
+  ;;
+run)
+  if [ -z "$2" ]; then
+    echo "Usage: $0 run <name> -- <command>"
+    exit 1
+  fi
 
-        # Create .wt/setup template if it doesn't exist
-        if [ ! -f ".wt/setup" ]; then
-            cat > .wt/setup << 'EOF'
+  NAME="$2"
+
+  # Check if -- delimiter exists and extract command
+  if [ "$3" != "--" ]; then
+    echo "Usage: $0 run <name> -- <command>"
+    exit 1
+  fi
+
+  if [ -z "$4" ]; then
+    echo "Usage: $0 run <name> -- <command>"
+    exit 1
+  fi
+
+  # Extract command arguments (everything after --)
+  COMMAND_ARGS="${*:4}"
+  # Sanitize branch name for directory use (replace / and other invalid chars with _)
+  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+
+  # Create .wt directory and .gitignore if they don't exist
+  if [ ! -d ".wt" ]; then
+    mkdir -p .wt
+    echo "worktrees" >.wt/.gitignore
+    echo "*.local" >.wt/.gitignore
+  fi
+
+  # Create .wt/setup template if it doesn't exist
+  if [ ! -f ".wt/setup" ]; then
+    cat >.wt/setup <<'EOF'
 #! /bin/bash
 # wt - Git Worktree Management Tool
 # https://github.com/tumf/wt
 # $ROOT_WORKTREE_PATH is path to the base repository (source tree)
 EOF
-        fi
+  fi
 
-        mkdir -p .wt/worktrees
+  mkdir -p .wt/worktrees
 
-        # Check if worktree already exists
-        if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
-            echo "Worktree '$NAME' exists, running command in it"
-        else
-            echo "Worktree '$NAME' does not exist, creating it first"
+  # Check if worktree already exists
+  if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
+    echo "Worktree '$NAME' exists, running command in it"
+  else
+    echo "Worktree '$NAME' does not exist, creating it first"
 
-            # Check if branch exists
-            if git branch --list "$NAME" | grep -q "$NAME"; then
-                echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-                git worktree add "$WORKTREE_DIR" "$NAME"
-            else
-                echo "Creating new branch '$NAME' and adding worktree."
-                git worktree add "$WORKTREE_DIR" -b "$NAME"
-            fi
+    # Check if branch exists
+    if git branch --list "$NAME" | grep -q "$NAME"; then
+      echo "Branch '$NAME' already exists. Adding worktree without -b flag."
+      git worktree add "$WORKTREE_DIR" "$NAME"
+    else
+      echo "Creating new branch '$NAME' and adding worktree."
+      git worktree add "$WORKTREE_DIR" -b "$NAME"
+    fi
 
-            # Create symlink in .wt/worktrees directory
-            if [ -e "$SYMLINK_PATH" ]; then
-                echo "Symlink already exists at $SYMLINK_PATH"
-                exit 1
-            fi
+    # Create symlink in .wt/worktrees directory
+    if [ -e "$SYMLINK_PATH" ]; then
+      echo "Symlink already exists at $SYMLINK_PATH"
+      exit 1
+    fi
 
-            ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
-            echo "Created worktree at $WORKTREE_DIR"
-            echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
+    ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+    echo "Created worktree at $WORKTREE_DIR"
+    echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
-            # Copy setup script to worktree if it exists in project
-            if [ -f ".wt/setup" ]; then
-                mkdir -p "$WORKTREE_DIR/.wt"
-                cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
-                chmod +x "$WORKTREE_DIR/.wt/setup"
+    # Copy setup script to worktree if it exists in project
+    if [ -f ".wt/setup" ]; then
+      mkdir -p "$WORKTREE_DIR/.wt"
+      cp ".wt/setup" "$WORKTREE_DIR/.wt/setup"
+      chmod +x "$WORKTREE_DIR/.wt/setup"
 
-                echo "Running setup script..."
-                ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
-                echo "Setup script completed"
-            fi
-        fi
+      echo "Running setup script..."
+      ROOT_WORKTREE_PATH="$(pwd)" bash "$WORKTREE_DIR/.wt/setup"
+      echo "Setup script completed"
+    fi
+  fi
 
-        # Store current directory and execute command in worktree
-        CURRENT_DIR="$(pwd)"
-        echo "Running command in worktree '$NAME': $COMMAND_ARGS"
-        cd "$WORKTREE_DIR"
-        eval "$COMMAND_ARGS"
-        EXIT_CODE=$?
-        cd "$CURRENT_DIR"
-        exit $EXIT_CODE
-        ;;
-    version|--version|-v)
-        echo "wt version $WT_VERSION"
-        ;;
-    complations)
-        echo "Did you mean 'completions'?" >&2
-        echo "Usage: $0 completions <bash|zsh|fish|powershell>" >&2
-        exit 1
-        ;;
-    completions)
-        SHELL_NAME="$2"
-        if [ -z "$SHELL_NAME" ]; then
-            echo "Usage: $0 completions <bash|zsh|fish|powershell>"
-            echo
-            echo "Install instructions:"
-            echo "- bash:        wt completions bash > ~/.local/share/bash-completion/completions/wt (or /etc/bash_completion.d/wt)"
-            echo "- zsh:         wt completions zsh > ~/.zsh/completions/_wt; echo 'fpath+=(~/.zsh/completions)' >> ~/.zshrc; autoload -Uz compinit && compinit"
-            echo "- fish:        wt completions fish > ~/.config/fish/completions/wt.fish"
-            echo "- powershell:  wt completions powershell | Out-String | Invoke-Expression (or save to your profile)"
-            exit 1
-        fi
-        case "$SHELL_NAME" in
-            bash)
-                cat <<'EOF'
+  # Store current directory and execute command in worktree
+  CURRENT_DIR="$(pwd)"
+  echo "Running command in worktree '$NAME': $COMMAND_ARGS"
+  cd "$WORKTREE_DIR"
+  eval "$COMMAND_ARGS"
+  EXIT_CODE=$?
+  cd "$CURRENT_DIR"
+  exit $EXIT_CODE
+  ;;
+version | --version | -v)
+  echo "wt version $WT_VERSION"
+  ;;
+complations)
+  echo "Did you mean 'completions'?" >&2
+  echo "Usage: $0 completions <bash|zsh|fish|powershell>" >&2
+  exit 1
+  ;;
+completions)
+  SHELL_NAME="$2"
+  if [ -z "$SHELL_NAME" ]; then
+    echo "Usage: $0 completions <bash|zsh|fish|powershell>"
+    echo
+    echo "Install instructions:"
+    echo "- bash:        wt completions bash > ~/.local/share/bash-completion/completions/wt (or /etc/bash_completion.d/wt)"
+    echo "- zsh:         wt completions zsh > ~/.zsh/completions/_wt; echo 'fpath+=(~/.zsh/completions)' >> ~/.zshrc; autoload -Uz compinit && compinit"
+    echo "- fish:        wt completions fish > ~/.config/fish/completions/wt.fish"
+    echo "- powershell:  wt completions powershell | Out-String | Invoke-Expression (or save to your profile)"
+    exit 1
+  fi
+  case "$SHELL_NAME" in
+  bash)
+    cat <<'EOF'
 # bash completion for wt
 _wt()
 {
@@ -412,9 +412,9 @@ _wt()
 }
 complete -F _wt wt ./wt
 EOF
-                ;;
-            zsh)
-                cat <<'EOF'
+    ;;
+  zsh)
+    cat <<'EOF'
 #compdef wt ./wt
 
 local -a names
@@ -453,9 +453,9 @@ elif [[ $CURRENT -eq 3 ]]; then
   esac
 fi
 EOF
-                ;;
-            fish)
-                cat <<'EOF'
+    ;;
+  fish)
+    cat <<'EOF'
 # fish completion for wt
 complete -c wt -f
 complete -c wt -n '__fish_use_subcommand' -a add -d 'Add a worktree'
@@ -482,9 +482,9 @@ complete -c wt -n '__fish_seen_subcommand_from run' -a "$__wt_names"
 # shells for completions
 complete -c wt -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish powershell'
 EOF
-                ;;
-            powershell|pwsh|ps)
-                cat <<'EOF'
+    ;;
+  powershell | pwsh | ps)
+    cat <<'EOF'
 # PowerShell argument completer for wt
 Register-ArgumentCompleter -CommandName wt -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
@@ -523,34 +523,33 @@ Register-ArgumentCompleter -CommandName wt -ScriptBlock {
   $names | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
 }
 EOF
-                ;;
-            *)
-                echo "Unsupported shell: $SHELL_NAME"
-                echo "Supported: bash, zsh, fish, powershell"
-                exit 1
-                ;;
-        esac
-        ;;
-    ""|*)
-        # No subcommand provided, show help
-        echo "wt - Git Worktree Management Tool v$WT_VERSION"
-        echo ""
-        echo "Usage: $0 <command> [options]"
-        echo ""
-        echo "Commands:"
-        echo "  add <name>        Add a new worktree"
-        echo "  remove <name>     Remove a worktree"
-        echo "  list              List all worktrees"
-        echo "  go <name>         Create worktree if needed and navigate to it"
-        echo "  run <name> -- <command>  Run command in worktree (creates if needed)"
-        echo "  version           Show version information"
-        echo ""
-        echo "Examples:"
-        echo "  $0 add feature-branch"
-        echo "  $0 go feature-branch"
-        echo "  $0 run feature-branch -- git status"
-        echo ""
-        git worktree list
-        ;;
- esac
-
+    ;;
+  *)
+    echo "Unsupported shell: $SHELL_NAME"
+    echo "Supported: bash, zsh, fish, powershell"
+    exit 1
+    ;;
+  esac
+  ;;
+"" | *)
+  # No subcommand provided, show help
+  echo "wt - Git Worktree Management Tool v$WT_VERSION"
+  echo ""
+  echo "Usage: $0 <command> [options]"
+  echo ""
+  echo "Commands:"
+  echo "  add <name>        Add a new worktree"
+  echo "  remove <name>     Remove a worktree"
+  echo "  list              List all worktrees"
+  echo "  go <name>         Create worktree if needed and navigate to it"
+  echo "  run <name> -- <command>  Run command in worktree (creates if needed)"
+  echo "  version           Show version information"
+  echo ""
+  echo "Examples:"
+  echo "  $0 add feature-branch"
+  echo "  $0 go feature-branch"
+  echo "  $0 run feature-branch -- git status"
+  echo ""
+  git worktree list
+  ;;
+esac
