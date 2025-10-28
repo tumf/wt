@@ -270,25 +270,28 @@ EOF
   ;;
 run)
   if [ -z "$2" ]; then
-    echo "Usage: $0 run <name> -- <command>"
+    echo "Usage: $0 run <name> [--] <command>"
     exit 1
   fi
 
   NAME="$2"
 
-  # Check if -- delimiter exists and extract command
-  if [ "$3" != "--" ]; then
-    echo "Usage: $0 run <name> -- <command>"
-    exit 1
+  # Extract command arguments
+  # If -- delimiter exists, use everything after it
+  # Otherwise, use everything from 3rd argument onwards
+  if [ "$3" = "--" ]; then
+    if [ -z "$4" ]; then
+      echo "Usage: $0 run <name> -- <command>"
+      exit 1
+    fi
+    COMMAND_ARGS="${*:4}"
+  else
+    if [ -z "$3" ]; then
+      echo "Usage: $0 run <name> [--] <command>"
+      exit 1
+    fi
+    COMMAND_ARGS="${*:3}"
   fi
-
-  if [ -z "$4" ]; then
-    echo "Usage: $0 run <name> -- <command>"
-    exit 1
-  fi
-
-  # Extract command arguments (everything after --)
-  COMMAND_ARGS="${*:4}"
   # Sanitize branch name for directory use (replace / and other invalid chars with _)
   SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
   WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
@@ -595,13 +598,14 @@ EOF
   echo "  remove <name>     Remove a worktree"
   echo "  list              List all worktrees"
   echo "  go <name>         Create worktree if needed and navigate to it"
-  echo "  run <name> -- <command>  Run command in worktree (creates if needed)"
+  echo "  run <name> [--] <command>  Run command in worktree (creates if needed)"
   echo "  version           Show version information"
   echo ""
   echo "Examples:"
   echo "  $0 add feature-branch"
   echo "  $0 go feature-branch"
-  echo "  $0 run feature-branch -- git status"
+  echo "  $0 run feature-branch git status"
+  echo "  $0 run feature-branch -- git stash pop"
   echo ""
   git worktree list
   ;;

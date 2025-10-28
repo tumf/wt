@@ -32,14 +32,15 @@ Creates a worktree if needed and navigates to it.
 # Creates worktree if missing, then provides navigation guidance
 ```
 
-### `./wt run <name> -- <command>`
+### `./wt run <name> [--] <command>`
 
-Creates a worktree if needed and runs a command in it.
+Creates a worktree if needed and runs a command in it. The `--` (double hyphen) is an option terminator indicating "everything after this is arguments, not options to wt". It's optional for simple commands but recommended when using command flags.
 
 ```bash
-./wt run feature-login -- git status
-./wt run feature-login -- npm install
-./wt run feature-login -- npm test
+./wt run feature-login git status
+./wt run feature-login npm install
+./wt run feature-login npm test
+./wt run feature-login -- git stash -u  # -- prevents git flags from being treated as wt options
 ```
 
 **Advanced Example: Create tmux window and open Claude Code**
@@ -204,14 +205,19 @@ Creates a worktree if needed and navigates to it.
 2. Provides navigation guidance to worktree directory
 3. Runs setup script if creating new worktree
 
-### `./wt run <name> -- <command>`
+### `./wt run <name> [--] <command>`
 
-Creates a worktree if needed and runs a command in it.
+Creates a worktree if needed and runs a command in it. The `--` (double hyphen) is an option terminator that tells the shell "everything after this is arguments, not options to wt". It's optional for simple commands but recommended when your command has flags that might be confused with wt options.
 
 ```bash
-./wt run feature-login -- git status
-./wt run feature-login -- npm install
-./wt run bugfix-123 -- make test
+# Simple commands without -- delimiter
+./wt run feature-login git status
+./wt run feature-login npm install
+
+# Commands with flags - use -- delimiter to avoid confusion
+./wt run feature-login -- git stash -u
+./wt run feature-login -- npm run test -- --watch
+./wt run bugfix-123 -- make test VERBOSE=1
 
 # Create tmux window and open Claude Code in the worktree
 ./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
@@ -403,9 +409,13 @@ cd .wt/worktrees/feature-dashboard # Work on dashboard
 ### Running Commands in Worktrees
 
 ```bash
-# Run tests across different worktrees
-./wt run feature-auth -- npm test
-./wt run bugfix-123 -- make test
+# Run tests across different worktrees (simple command, no -- needed)
+./wt run feature-auth npm test
+./wt run bugfix-123 make test
+
+# Commands with flags should use -- delimiter
+./wt run feature-auth -- npm test -- --watch
+./wt run bugfix-123 -- make test VERBOSE=1
 
 # Open Claude Code in tmux window for a worktree
 ./wt run feature-login -- bash -c 'tmux new-window -n feature-login -c "$(pwd)" \; send-keys "cursor code ." Enter'
