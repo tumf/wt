@@ -293,18 +293,18 @@ _wt()
                 COMPREPLY=( $(compgen -W "--force -f" -- "$cur") )
             else
                 local names
-                names=$(command ls -1 .wt/worktrees 2>/dev/null)
+                names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
                 if [ -z "$names" ]; then
-                    names=$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+                    names=$(command ls -1 .wt/worktrees 2>/dev/null)
                 fi
                 COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             fi
             ;;
         go|add|run)
             local names
-            names=$(command ls -1 .wt/worktrees 2>/dev/null)
+            names=$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
             if [ -z "$names" ]; then
-                names=$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+                names=$(command ls -1 .wt/worktrees 2>/dev/null)
             fi
             COMPREPLY=( $(compgen -W "$names" -- "$cur") )
             ;;
@@ -324,9 +324,9 @@ EOF
 local -a names
 
 _wt_get_worktrees() {
-  names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
+  names=(${(f)"$(git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)"})
   if [[ ${#names} -eq 0 ]]; then
-    names=(${(f)"$(git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)"})
+    names=(${(f)"$(command ls -1 .wt/worktrees 2>/dev/null)"})
   fi
 }
 
@@ -374,9 +374,9 @@ complete -c wt -n '__fish_use_subcommand' -a completions -d 'Generate shell comp
 complete -c wt -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
 complete -c wt -n '__fish_seen_subcommand_from rm' -s f -l force -d 'Force removal'
 # worktree names for relevant subcommands
-set -l __wt_names (command ls -1 .wt/worktrees 2>/dev/null)
+set -l __wt_names (git worktree list 2>/dev/null | sed -n 's/.*\[\([^]]*\)\].*/\1/p' | sort -u)
 if test -z "$__wt_names"
-    set __wt_names (git worktree list --porcelain 2>/dev/null | awk '/^branch /{ sub("refs\/heads\/","",$2); print $2 }' | sort -u)
+    set __wt_names (command ls -1 .wt/worktrees 2>/dev/null)
 end
 complete -c wt -n '__fish_seen_subcommand_from go' -a "$__wt_names"
 complete -c wt -n '__fish_seen_subcommand_from add' -a "$__wt_names"
@@ -413,7 +413,17 @@ Register-ArgumentCompleter -CommandName wt -ScriptBlock {
   return
   :names
   $names = @()
-  try { $names = Get-ChildItem -Name '.wt/worktrees' -ErrorAction Stop } catch {}
+  try {
+    $output = git worktree list 2>$null
+    foreach ($line in $output) {
+      if ($line -match '\[([^\]]+)\]') {
+        $names += $matches[1]
+      }
+    }
+  } catch {}
+  if ($names.Count -eq 0) {
+    try { $names = Get-ChildItem -Name '.wt/worktrees' -ErrorAction Stop } catch {}
+  }
   $names | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
 }
 EOF
