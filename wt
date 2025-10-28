@@ -296,33 +296,32 @@ _wt_get_worktrees() {
   fi
 }
 
-case $CURRENT in
-  1)
-    local -a subcommands
-    subcommands=(
-      'add:Add a worktree'
-      'remove:Remove a worktree'
-      'rm:Alias of remove'
-      'list:List worktrees'
-      'go:Create or navigate to worktree'
-      'run:Run command in worktree'
-      'version:Show version'
-      'completions:Generate shell completion script'
-    )
-    _describe 'command' subcommands
-    ;;
-  2)
-    case $words[2] in
-      add|go|remove|rm|run)
-        _wt_get_worktrees
-        _describe 'worktree' names
-        ;;
-      completions)
-        _values 'shell' bash zsh fish powershell
-        ;;
-    esac
-    ;;
-esac
+if [[ $CURRENT -eq 2 ]]; then
+  # Completing subcommand (first argument)
+  local -a subcommands
+  subcommands=(
+    'add:Add a worktree'
+    'remove:Remove a worktree'
+    'rm:Alias of remove'
+    'list:List worktrees'
+    'go:Create or navigate to worktree'
+    'run:Run command in worktree'
+    'version:Show version'
+    'completions:Generate shell completion script'
+  )
+  _describe 'command' subcommands
+elif [[ $CURRENT -eq 3 ]]; then
+  # Completing argument to subcommand
+  case $words[2] in
+    add|go|remove|rm|run)
+      _wt_get_worktrees
+      _describe 'worktree' names
+      ;;
+    completions)
+      _values 'shell' bash zsh fish powershell
+      ;;
+  esac
+fi
 EOF
                 ;;
             fish)
