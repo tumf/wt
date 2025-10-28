@@ -12,6 +12,102 @@ DIR_NAME=$(basename "$(pwd)")
 # Default worktree directory
 TMP_DIR="${HOME}/.wt/worktrees"
 
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+# Sanitize branch name for directory use (replace / and other invalid chars with _)
+sanitize_name() {
+  echo "$1" | sed 's/[\\/\\:*?"<>|]/_/g'
+}
+
+# Get worktree directory path
+get_worktree_dir() {
+  local name="$1"
+  local safe_name
+  safe_name=$(sanitize_name "$name")
+  echo "${TMP_DIR}/${DIR_NAME}-${safe_name}"
+}
+
+# Get symlink path
+get_symlink_path() {
+  local name="$1"
+  local safe_name
+  safe_name=$(sanitize_name "$name")
+  echo ".wt/worktrees/${safe_name}"
+}
+
+# Initialize .wt directory structure
+init_wt_directory() {
+  # Create .wt directory and .gitignore if they don't exist
+  if [ ! -d ".wt" ]; then
+    mkdir -p .wt
+    cat >.wt/.gitignore <<'EOF'
+worktrees
+*.local
+EOF
+  fi
+
+  # Create .wt/setup template if it doesn't exist
+  if [ ! -f ".wt/setup" ]; then
+    cat >.wt/setup <<'EOF'
+#! /bin/bash
+# wt - Git Worktree Management Tool
+# https://github.com/tumf/wt
+# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
+if [ -f .wt/setup.local ]; then
+  source .wt/setup.local
+fi
+EOF
+  fi
+
+  mkdir -p .wt/worktrees
+}
+
+# Create or add to existing worktree
+create_worktree() {
+  local name="$1"
+  local worktree_dir="$2"
+
+  # Check if branch exists
+  if git branch --list "$name" | grep -q "$name"; then
+    echo "Branch '$name' already exists. Adding worktree without -b flag."
+    git worktree add "$worktree_dir" "$name"
+  else
+    echo "Creating new branch '$name' and adding worktree."
+    git worktree add "$worktree_dir" -b "$name"
+  fi
+}
+
+# Create symlink to worktree
+create_symlink() {
+  local worktree_dir="$1"
+  local symlink_path="$2"
+  local force="${3:-false}"
+
+  if [ -e "$symlink_path" ]; then
+    if [ "$force" = true ]; then
+      echo "Symlink already exists at $symlink_path, removing old symlink"
+      rm "$symlink_path"
+    else
+      echo "Symlink already exists at $symlink_path"
+      exit 1
+    fi
+  fi
+
+  ln -s "$worktree_dir" "$symlink_path"
+  echo "Created symlink $symlink_path -> $worktree_dir"
+}
+
+# Run setup script if it exists
+run_setup_script() {
+  if [ -f ".wt/setup" ]; then
+    echo "Running setup script..."
+    ROOT_WORKTREE_PATH="$(pwd)" bash ".wt/setup"
+    echo "Setup script completed"
+  fi
+}
+
 # Function to run setup script in worktree if it's a new worktree
 run_setup_if_new() {
   local worktree_dir="$1"
@@ -29,6 +125,20 @@ run_setup_if_new() {
   fi
 }
 
+# Check if worktree exists and is valid
+worktree_exists() {
+  local worktree_dir="$1"
+
+  if git worktree list --porcelain | grep -q "worktree $worktree_dir"; then
+    # Check if it's prunable (directory doesn't exist)
+    if [ ! -d "$worktree_dir" ]; then
+      return 1 # Exists but is prunable
+    fi
+    return 0 # Exists and is valid
+  fi
+  return 1 # Does not exist
+}
+
 case "$1" in
 add)
   if [ -z "$2" ]; then
@@ -37,31 +147,11 @@ add)
   fi
 
   NAME="$2"
-  # Sanitize branch name for directory use (replace / and other invalid chars with _)
-  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
+  WORKTREE_DIR=$(get_worktree_dir "$NAME")
+  SYMLINK_PATH=$(get_symlink_path "$NAME")
 
-  # Create .wt directory and .gitignore if they don't exist
-  if [ ! -d ".wt" ]; then
-    mkdir -p .wt
-    cat >.wt/.gitignore <<'EOF'
-worktrees
-*.local
-EOF
-  fi
-
-  # Create .wt/setup template if it doesn't exist
-  if [ ! -f ".wt/setup" ]; then
-    cat >.wt/setup <<'EOF'
-#! /bin/bash
-# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
-if [ -f .wt/setup.local ]; then
-  source .wt/setup.local
-fi
-EOF
-  fi
-
-  mkdir -p .wt/worktrees
+  # Initialize .wt directory structure
+  init_wt_directory
 
   # Check if worktree already exists
   if git worktree list --porcelain | grep -q "worktree $WORKTREE_DIR"; then
@@ -69,25 +159,12 @@ EOF
     exit 1
   fi
 
-  # Check if branch exists
-  if git branch --list "$NAME" | grep -q "$NAME"; then
-    echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-    git worktree add "$WORKTREE_DIR" "$NAME"
-  else
-    echo "Creating new branch '$NAME' and adding worktree."
-    git worktree add "$WORKTREE_DIR" -b "$NAME"
-  fi
+  # Create worktree
+  create_worktree "$NAME" "$WORKTREE_DIR"
 
-  # Create symlink in .wt/worktrees directory
-  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
-  if [ -e "$SYMLINK_PATH" ]; then
-    echo "Symlink already exists at $SYMLINK_PATH"
-    exit 1
-  fi
-
-  ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+  # Create symlink
+  create_symlink "$WORKTREE_DIR" "$SYMLINK_PATH"
   echo "Created worktree at $WORKTREE_DIR"
-  echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
   # Run setup script if it exists in worktree
   ROOT_PATH="$(pwd)"
@@ -118,9 +195,7 @@ remove | rm)
     exit 1
   fi
 
-  # Sanitize branch name for directory use (replace / and other invalid chars with _)
-  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+  SYMLINK_PATH=$(get_symlink_path "$NAME")
 
   # Debug: show what we're checking
   if [ ! -e "$SYMLINK_PATH" ]; then
@@ -188,31 +263,11 @@ go)
   fi
 
   NAME="$2"
-  # Sanitize branch name for directory use (replace / and other invalid chars with _)
-  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
-  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
+  WORKTREE_DIR=$(get_worktree_dir "$NAME")
+  SYMLINK_PATH=$(get_symlink_path "$NAME")
 
-  # Create .wt directory and .gitignore if they don't exist
-  if [ ! -d ".wt" ]; then
-    mkdir -p .wt
-    cat >.wt/.gitignore <<'EOF'
-worktrees
-*.local
-EOF
-  fi
-
-  # Create .wt/setup template if it doesn't exist
-  if [ ! -f ".wt/setup" ]; then
-    cat >.wt/setup <<'EOF'
-#! /bin/bash
-# wt - Git Worktree Management Tool
-# https://github.com/tumf/wt
-# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
-EOF
-  fi
-
-  mkdir -p .wt/worktrees
+  # Initialize .wt directory structure
+  init_wt_directory
 
   # Check if worktree already exists
   WORKTREE_EXISTS=false
@@ -235,24 +290,12 @@ EOF
   if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
     echo "Worktree '$NAME' does not exist, creating it first"
 
-    # Check if branch exists
-    if git branch --list "$NAME" | grep -q "$NAME"; then
-      echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-      git worktree add "$WORKTREE_DIR" "$NAME"
-    else
-      echo "Creating new branch '$NAME' and adding worktree."
-      git worktree add "$WORKTREE_DIR" -b "$NAME"
-    fi
+    # Create worktree
+    create_worktree "$NAME" "$WORKTREE_DIR"
 
-    # Create symlink in .wt/worktrees directory
-    if [ -e "$SYMLINK_PATH" ]; then
-      echo "Symlink already exists at $SYMLINK_PATH, removing old symlink"
-      rm "$SYMLINK_PATH"
-    fi
-
-    ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+    # Create symlink (force=true to remove old symlink if exists)
+    create_symlink "$WORKTREE_DIR" "$SYMLINK_PATH" true
     echo "Created worktree at $WORKTREE_DIR"
-    echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
     # Run setup script if it exists in worktree (only for newly created worktrees)
     ROOT_PATH="$(pwd)"
@@ -293,29 +336,12 @@ run)
     fi
     COMMAND_ARGS="${*:3}"
   fi
-  # Sanitize branch name for directory use (replace / and other invalid chars with _)
-  SAFE_NAME=$(echo "$NAME" | sed 's/[\/\\:*?"<>|]/_/g')
-  WORKTREE_DIR="${TMP_DIR}/${DIR_NAME}-${SAFE_NAME}"
-  SYMLINK_PATH=".wt/worktrees/${SAFE_NAME}"
 
-  # Create .wt directory and .gitignore if they don't exist
-  if [ ! -d ".wt" ]; then
-    mkdir -p .wt
-    echo "worktrees" >.wt/.gitignore
-    echo "*.local" >.wt/.gitignore
-  fi
+  WORKTREE_DIR=$(get_worktree_dir "$NAME")
+  SYMLINK_PATH=$(get_symlink_path "$NAME")
 
-  # Create .wt/setup template if it doesn't exist
-  if [ ! -f ".wt/setup" ]; then
-    cat >.wt/setup <<'EOF'
-#! /bin/bash
-# wt - Git Worktree Management Tool
-# https://github.com/tumf/wt
-# $ROOT_WORKTREE_PATH is path to the base repository (source tree)
-EOF
-  fi
-
-  mkdir -p .wt/worktrees
+  # Initialize .wt directory structure
+  init_wt_directory
 
   # Check if worktree already exists
   WORKTREE_EXISTS=false
@@ -338,24 +364,12 @@ EOF
   if [ "$WORKTREE_EXISTS" = false ] || [ "$IS_PRUNABLE" = true ]; then
     echo "Worktree '$NAME' does not exist, creating it first"
 
-    # Check if branch exists
-    if git branch --list "$NAME" | grep -q "$NAME"; then
-      echo "Branch '$NAME' already exists. Adding worktree without -b flag."
-      git worktree add "$WORKTREE_DIR" "$NAME"
-    else
-      echo "Creating new branch '$NAME' and adding worktree."
-      git worktree add "$WORKTREE_DIR" -b "$NAME"
-    fi
+    # Create worktree
+    create_worktree "$NAME" "$WORKTREE_DIR"
 
-    # Create symlink in .wt/worktrees directory
-    if [ -e "$SYMLINK_PATH" ]; then
-      echo "Symlink already exists at $SYMLINK_PATH, removing old symlink"
-      rm "$SYMLINK_PATH"
-    fi
-
-    ln -s "$WORKTREE_DIR" "$SYMLINK_PATH"
+    # Create symlink
+    create_symlink "$WORKTREE_DIR" "$SYMLINK_PATH"
     echo "Created worktree at $WORKTREE_DIR"
-    echo "Created symlink $SYMLINK_PATH -> $WORKTREE_DIR"
 
     # Run setup script if it exists in worktree (only for newly created worktrees)
     ROOT_PATH="$(pwd)"
