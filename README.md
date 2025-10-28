@@ -50,8 +50,54 @@ Creates a worktree if needed and navigates to it.
 ```bash
    chmod +x wt
    ```
+ 
+## 🔁 Shell Completions
+
+`wt` can generate shell completion scripts with `./wt completions <bash|zsh|fish|powershell>`. Install the output for your shell to enable subcommand and argument hints:
+
+### Bash
+```bash
+# User-level install (ensure directory exists)
+mkdir -p ~/.local/share/bash-completion/completions
+./wt completions bash > ~/.local/share/bash-completion/completions/wt
+
+# System-wide alternative (requires sudo)
+# sudo ./wt completions bash > /etc/bash_completion.d/wt
+```
+Reload your shell or run `source ~/.bashrc` to activate.
+
+### Zsh
+```bash
+mkdir -p ~/.zsh/completions
+./wt completions zsh > ~/.zsh/completions/_wt
+
+# Add the completions directory to your fpath once
+if ! grep -q 'fpath+=(~/.zsh/completions)' ~/.zshrc; then
+  echo 'fpath+=(~/.zsh/completions)' >> ~/.zshrc
+fi
+```
+Then restart your shell or run `autoload -Uz compinit && compinit`.
+
+### Fish
+```bash
+mkdir -p ~/.config/fish/completions
+./wt completions fish > ~/.config/fish/completions/wt.fish
+```
+New shells will pick up the completion automatically.
+
+### PowerShell (pwsh)
+```powershell
+# Apply to the current session
+./wt completions powershell | Out-String | Invoke-Expression
+
+# Persist for future sessions (PowerShell 7+)
+./wt completions powershell > "$HOME/.config/powershell/completions/wt.ps1"
+Add-Content -Path "$HOME/.config/powershell/Microsoft.PowerShell_profile.ps1" -Value "& '$HOME/.config/powershell/completions/wt.ps1'"  # once
+```
+Restart PowerShell after updating your profile.
 
 ## 🎯 Why Use wt?
+
 
 Managing git worktrees manually can be cumbersome. `wt` simplifies this by:
 
